@@ -6,6 +6,7 @@ import { DashboardPage } from '@/pages/DashboardPage'
 import { PipelinePage } from '@/pages/PipelinePage'
 import { ContactsPage } from '@/pages/ContactsPage'
 import { OrganisationsPage } from '@/pages/OrganisationsPage'
+import { OrganisationDetailPage } from '@/pages/OrganisationDetailPage'
 
 export default function App() {
   return (
@@ -17,7 +18,9 @@ export default function App() {
           <Route index element={<DashboardPage />} />
           <Route path="pipeline" element={<PipelinePage />} />
           <Route path="contacts" element={<ContactsPage />} />
+          <Route path="contacts/:contactId" element={<ContactsPage />} />
           <Route path="organisations" element={<OrganisationsPage />} />
+          <Route path="organisations/:id" element={<OrganisationDetailPage />} />
         </Route>
       </Route>
     </Routes>
