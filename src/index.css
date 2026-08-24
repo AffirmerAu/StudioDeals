@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------
+   StudioDeals theme tokens.
+   Dark is the default; .light on <html> flips them.
+   Every colour in the app should reference a token, never a hex.
+   --------------------------------------------------------------- */
+@theme {
+  --font-sans: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Affirmer Blue */
+  --color-brand-50:  #eaf3fc;
+  --color-brand-100: #cfe4f8;
+  --color-brand-300: #7fb6e8;
+  --color-brand-500: #3385d9;
+  --color-brand-600: #2a6fb8;
+  --color-brand-700: #215891;
+
+  /* Pipeline stage semantics */
+  --color-stage-new:      #6b7280;
+  --color-stage-meeting:  #3385d9;
+  --color-stage-proposal: #8b5cf6;
+  --color-stage-verbal:   #f59e0b;
+  --color-stage-won:      #10b981;
+  --color-stage-lost:     #64748b;
+}
+
+@layer base {
+  :root {
+    --surface:        #12141a;
+    --surface-raised: #1a1d26;
+    --surface-hover:  #222634;
+    --border:         #2a2e3d;
+    --text:           #e8eaf0;
+    --text-muted:     #9096a8;
+    --text-subtle:    #646a7d;
+  }
+
+  :root.light {
+    --surface:        #ffffff;
+    --surface-raised: #f7f8fa;
+    --surface-hover:  #eef0f4;
+    --border:         #e1e4ea;
+    --text:           #12141a;
+    --text-muted:     #5c6273;
+    --text-subtle:    #8a90a0;
+  }
+
+  html { color-scheme: dark; }
+  html.light { color-scheme: light; }
+
+  body {
+    background: var(--surface);
+    color: var(--text);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    transition: background 150ms ease-out, color 150ms ease-out;
+  }
+
+  /* Monetary and numeric values always use the mono face */
+  .tabular { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+}
