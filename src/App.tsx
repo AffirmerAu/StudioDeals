@@ -1,16 +1,25 @@
+import { Route, Routes } from 'react-router-dom'
+import { AppShell } from '@/components/AppShell'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { LoginPage } from '@/pages/LoginPage'
+import { DashboardPage } from '@/pages/DashboardPage'
+import { PipelinePage } from '@/pages/PipelinePage'
+import { ContactsPage } from '@/pages/ContactsPage'
+import { OrganisationsPage } from '@/pages/OrganisationsPage'
+
 export default function App() {
   return (
-    <div className="min-h-screen flex items-center justify-center p-8">
-      <div className="max-w-md text-center">
-        <h1 className="text-2xl font-semibold tracking-tight">StudioDeals</h1>
-        <p className="mt-2 text-sm" style={{ color: 'var(--text-muted)' }}>
-          Scaffold ready. Next: Phase 1 — app shell, auth guard, sidebar
-          navigation, and theme toggle.
-        </p>
-        <p className="mt-6 tabular text-xs" style={{ color: 'var(--text-subtle)' }}>
-          React 19 · Vite 8 · Tailwind 4 · Supabase
-        </p>
-      </div>
-    </div>
+    <Routes>
+      <Route path="/login" element={<LoginPage />} />
+
+      <Route element={<ProtectedRoute />}>
+        <Route element={<AppShell />}>
+          <Route index element={<DashboardPage />} />
+          <Route path="pipeline" element={<PipelinePage />} />
+          <Route path="contacts" element={<ContactsPage />} />
+          <Route path="organisations" element={<OrganisationsPage />} />
+        </Route>
+      </Route>
+    </Routes>
   )
 }
