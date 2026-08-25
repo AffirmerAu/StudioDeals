@@ -9,10 +9,12 @@ import {
   fetchWonValueSince,
   type StageValueTotal,
 } from '@/lib/dashboard'
+import { markDealHandedOff } from '@/lib/deals'
 import { formatCents, formatDate } from '@/lib/format'
 import { StatTile } from '@/components/StatTile'
 import { SkeletonBlock } from '@/components/Skeleton'
 import { EmptyState } from '@/components/EmptyState'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { StageValueChart } from '@/components/deals/StageValueChart'
 import { ForecastChart } from '@/components/deals/ForecastChart'
 import { NeedsAttentionList } from '@/components/deals/NeedsAttentionList'
@@ -33,6 +35,8 @@ export function DashboardPage() {
   const [needsAttention, setNeedsAttention] = useState<DealsNeedingAttentionRow[]>([])
   const [pendingHandoff, setPendingHandoff] = useState<PendingHandoffRow[]>([])
   const [wonThisMonth, setWonThisMonth] = useState({ count: 0, valueCents: 0 })
+  const [handoffDeal, setHandoffDeal] = useState<PendingHandoffRow | null>(null)
+  const [handoffBusy, setHandoffBusy] = useState(false)
 
   useEffect(() => {
     if (stagesLoading) return
@@ -66,6 +70,21 @@ export function DashboardPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stagesLoading])
+
+  const handleConfirmHandoff = async () => {
+    if (!handoffDeal) return
+    setHandoffBusy(true)
+    try {
+      await markDealHandedOff(handoffDeal.id)
+      setPendingHandoff((current) => current.filter((d) => d.id !== handoffDeal.id))
+      showToast('Queued for StudioTime handoff')
+      setHandoffDeal(null)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to record handoff', 'error')
+    } finally {
+      setHandoffBusy(false)
+    }
+  }
 
   const openStages = new Set(stages.filter((s) => !s.is_won && !s.is_lost).map((s) => s.id))
   const openValueCents = stageValues
@@ -129,15 +148,35 @@ export function DashboardPage() {
                       {deal.organisation_name}
                     </p>
                   </div>
-                  <span className="tabular shrink-0 text-xs" style={{ color: 'var(--text-subtle)' }}>
-                    Won {formatDate(deal.won_at)}
-                  </span>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="tabular text-xs" style={{ color: 'var(--text-subtle)' }}>
+                      Won {formatDate(deal.won_at)}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setHandoffDeal(deal)}
+                      className="rounded-lg px-2.5 py-1 text-xs font-medium text-white transition-colors duration-150"
+                      style={{ background: 'var(--color-brand-500)' }}
+                    >
+                      Send
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={handoffDeal !== null}
+        title="Send to StudioTime?"
+        message={handoffDeal ? `Send "${handoffDeal.title}" to StudioTime?` : ''}
+        confirmLabel="Send"
+        busy={handoffBusy}
+        onConfirm={handleConfirmHandoff}
+        onClose={() => setHandoffDeal(null)}
+      />
     </div>
   )
 }

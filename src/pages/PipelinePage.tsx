@@ -18,11 +18,13 @@ import { useToast } from '@/lib/toast-context'
 import {
   computeBoardPosition,
   listDealsForBoard,
+  markDealHandedOff,
   updateDealPosition,
   type DealBoardRow,
 } from '@/lib/deals'
 import { SkeletonBlock } from '@/components/Skeleton'
 import { EmptyState } from '@/components/EmptyState'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { PipelineColumn } from '@/components/deals/PipelineColumn'
 import { DealCardContent } from '@/components/deals/DealCard'
 import { DealFormModal } from '@/components/deals/DealFormModal'
@@ -50,6 +52,9 @@ export function PipelinePage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingDeal, setEditingDeal] = useState<DealBoardRow | null>(null)
   const [createStageId, setCreateStageId] = useState<number | null>(null)
+
+  const [handoffDeal, setHandoffDeal] = useState<DealBoardRow | null>(null)
+  const [handoffBusy, setHandoffBusy] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -113,6 +118,20 @@ export function PipelinePage() {
     return map
   }, [filteredDeals, stages])
 
+  const isWonStage = (stageId: number) => stages.find((s) => s.id === stageId)?.is_won ?? false
+
+  // Only prompt for a genuine transition into Won — not a reorder within
+  // Won, not a re-save of an already-Won deal, not non-production deals
+  // (matches v_pending_handoff's own filter), and never twice for the same
+  // deal.
+  const maybePromptHandoff = (previousStageId: number | null, deal: DealBoardRow) => {
+    if (deal.deal_type !== 'production') return
+    if (deal.handed_off_at) return
+    if (!isWonStage(deal.stage_id)) return
+    if (previousStageId !== null && isWonStage(previousStageId)) return
+    setHandoffDeal(deal)
+  }
+
   const openCreateModal = (stageId: number) => {
     setEditingDeal(null)
     setCreateStageId(stageId)
@@ -149,9 +168,9 @@ export function PipelinePage() {
     if (dragged.stage_id === destStageId && dragged.board_position === newPosition) return
 
     const previous = deals
-    setDeals((current) =>
-      current.map((d) => (d.id === dragged.id ? { ...d, stage_id: destStageId, board_position: newPosition } : d)),
-    )
+    const updatedDeal = { ...dragged, stage_id: destStageId, board_position: newPosition }
+    setDeals((current) => current.map((d) => (d.id === dragged.id ? updatedDeal : d)))
+    maybePromptHandoff(dragged.stage_id, updatedDeal)
 
     updateDealPosition(dragged.id, { stage_id: destStageId, board_position: newPosition }).catch(
       (error: unknown) => {
@@ -159,6 +178,23 @@ export function PipelinePage() {
         showToast(error instanceof Error ? error.message : 'Failed to move deal', 'error')
       },
     )
+  }
+
+  const handleConfirmHandoff = async () => {
+    if (!handoffDeal) return
+    setHandoffBusy(true)
+    try {
+      const { handedOffAt } = await markDealHandedOff(handoffDeal.id)
+      setDeals((current) =>
+        current.map((d) => (d.id === handoffDeal.id ? { ...d, handed_off_at: handedOffAt } : d)),
+      )
+      showToast('Queued for StudioTime handoff')
+      setHandoffDeal(null)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to record handoff', 'error')
+    } finally {
+      setHandoffBusy(false)
+    }
   }
 
   return (
@@ -247,10 +283,25 @@ export function PipelinePage() {
             return exists ? current.map((d) => (d.id === saved.id ? saved : d)) : [...current, saved]
           })
           setModalOpen(false)
+          maybePromptHandoff(editingDeal?.stage_id ?? null, saved)
         }}
         onSaveFailed={(previous) => {
           setDeals((current) => current.map((d) => (d.id === previous.id ? previous : d)))
         }}
+      />
+
+      <ConfirmDialog
+        open={handoffDeal !== null}
+        title="Send to StudioTime?"
+        message={
+          handoffDeal
+            ? `Send "${handoffDeal.title}" to StudioTime? You can also do this later from the dashboard.`
+            : ''
+        }
+        confirmLabel="Send"
+        busy={handoffBusy}
+        onConfirm={handleConfirmHandoff}
+        onClose={() => setHandoffDeal(null)}
       />
     </div>
   )

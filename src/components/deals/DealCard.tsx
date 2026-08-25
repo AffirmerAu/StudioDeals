@@ -29,6 +29,11 @@ export function DealCardContent({ deal, onClick }: DealCardContentProps) {
         </span>
         <span className="tabular text-sm font-medium">{formatCents(deal.value_cents)}</span>
       </div>
+      {deal.handed_off_at && (
+        <p className="mt-1.5 text-xs font-medium" style={{ color: 'var(--color-stage-won)' }}>
+          Sent to StudioTime
+        </p>
+      )}
     </div>
   )
 }
