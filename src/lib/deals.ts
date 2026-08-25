@@ -57,6 +57,13 @@ export async function listDealsForBoard(): Promise<DealBoardRow[]> {
   return (data ?? []).map(flattenBoardRow)
 }
 
+export async function getDeal(id: string): Promise<DealBoardRow | null> {
+  const { data, error } = await supabase.from('deals').select(BOARD_SELECT).eq('id', id).maybeSingle()
+
+  if (error) throw error
+  return data ? flattenBoardRow(data) : null
+}
+
 export async function updateDealPosition(
   id: string,
   values: { stage_id: number; board_position: number },
@@ -76,6 +83,25 @@ export function computeBoardPosition(columnDeals: DealBoardRow[], destIndex: num
   if (!before) return after.board_position / 2
   if (!after) return before.board_position + 1000
   return (before.board_position + after.board_position) / 2
+}
+
+/**
+ * The end of a stage's column. Used when a deal changes stage somewhere that
+ * isn't the board (the deal page), where there's no local copy of the
+ * destination column to slot it into — without this the card keeps whatever
+ * board_position it had in its old column and lands arbitrarily in the new one.
+ */
+export async function nextBoardPosition(stageId: number): Promise<number> {
+  const { data, error } = await supabase
+    .from('deals')
+    .select('board_position')
+    .eq('stage_id', stageId)
+    .order('board_position', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  return (data?.board_position ?? 0) + 1000
 }
 
 export type DealFormValues = Pick<
@@ -104,7 +130,10 @@ export async function createDeal(values: DealFormValues, boardPosition: number):
   return flattenBoardRow(data)
 }
 
-export async function updateDeal(id: string, values: DealFormValues): Promise<DealBoardRow> {
+export async function updateDeal(
+  id: string,
+  values: DealFormValues & { board_position?: number },
+): Promise<DealBoardRow> {
   const { data, error } = await supabase.from('deals').update(values).eq('id', id).select(BOARD_SELECT).single()
 
   if (error) throw error

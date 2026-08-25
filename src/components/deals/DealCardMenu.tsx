@@ -4,8 +4,8 @@ import { useOverlayLayer } from '@/lib/overlay-stack'
 import { ChevronDownIcon } from '@/components/icons'
 
 export interface DealCardMenuProps {
-  onEdit: () => void
-  onView: () => void
+  /** Same destination as clicking the card — the deal's own page. */
+  onOpen: () => void
   onMarkWon: () => void
   onMarkLost: () => void
   onDelete: () => void
@@ -17,8 +17,7 @@ export interface DealCardMenuProps {
 const MENU_WIDTH = 168
 
 export function DealCardMenu({
-  onEdit,
-  onView,
+  onOpen,
   onMarkWon,
   onMarkLost,
   onDelete,
@@ -87,7 +86,7 @@ export function DealCardMenu({
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label="Deal actions"
-        // The card itself is a dnd-kit drag handle and opens the edit modal on
+        // The card itself is a dnd-kit drag handle and opens the deal page on
         // click — both have to be held off so the trigger stays a button.
         onPointerDown={(event) => event.stopPropagation()}
         onClick={(event) => {
@@ -116,8 +115,7 @@ export function DealCardMenu({
               background: 'var(--surface-raised)',
             }}
           >
-            <MenuItem label="Edit" onClick={run(onEdit)} />
-            <MenuItem label="View" onClick={run(onView)} />
+            <MenuItem label="Open" onClick={run(onOpen)} />
 
             {(canMarkWon || canMarkLost) && (
               <div className="my-1 border-t" style={{ borderColor: 'var(--border)' }} />

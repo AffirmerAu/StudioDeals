@@ -1,163 +1,60 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { Modal } from '@/components/Modal'
-import { Combobox } from '@/components/Combobox'
 import { useToast } from '@/lib/toast-context'
 import { usePipelineStages } from '@/lib/pipeline-stages'
-import { createDeal, updateDeal, type DealBoardRow, type DealFormValues } from '@/lib/deals'
-import { searchOrganisations, type OrganisationOption } from '@/lib/organisations'
-import { searchContactsForOrganisation, type ContactOption } from '@/lib/contacts'
-import { centsToDollarInput, dollarInputToCents, fullName } from '@/lib/format'
-
-// The generated Row type has deal_type: string — Postgres CHECK constraints
-// aren't reflected in `supabase gen types`. This mirrors the constraint from
-// migrations/001_initial_schema.sql: check (deal_type in (...)).
-type DealType = 'production' | 'prestarter' | 'retainer' | 'other'
+import { createDeal, type DealBoardRow } from '@/lib/deals'
+import type { OrganisationOption } from '@/lib/organisations'
+import type { ContactOption } from '@/lib/contacts'
+import { DealFields } from '@/components/deals/DealFields'
+import { dealFormValues, emptyDealFormState, type DealFormState } from '@/components/deals/deal-form'
 
 interface DealFormModalProps {
   open: boolean
-  deal: DealBoardRow | null
   defaultStageId: number
   onClose: () => void
-  /** Called with the saved row once persisted (edits fire this optimistically, before the request resolves). */
-  onSaved: (saved: DealBoardRow) => void
-  /** Called only for edits, if the background save fails — use it to roll the optimistic update back. */
-  onSaveFailed?: (previous: DealBoardRow) => void
-  /** Only used for create — where to slot the new card in its stage. */
+  /** Called with the created row once persisted. */
+  onCreated: (created: DealBoardRow) => void
+  /** Where to slot the new card in its stage. */
   computeCreatePosition: (stageId: number) => number
 }
 
-const DEAL_TYPES: { value: DealType; label: string }[] = [
-  { value: 'production', label: 'Production' },
-  { value: 'prestarter', label: 'Prestarter' },
-  { value: 'retainer', label: 'Retainer' },
-  { value: 'other', label: 'Other' },
-]
-
-interface FormState {
-  title: string
-  stage_id: number
-  deal_type: DealType
-  valueDollars: string
-  expected_close_date: string
-  source: string
-  notes: string
-  /** Whole percent, or '' to fall back to the stage's own probability. */
-  probabilityPercent: string
-  lostReason: string
-}
-
-/** Whole percent in, 0–1 out. Anything outside 0–100 is treated as no
- * override rather than clamped, so a typo doesn't silently skew the forecast. */
-function percentToProbability(input: string): number | null {
-  const trimmed = input.trim()
-  if (!trimmed) return null
-  const n = Number.parseInt(trimmed, 10)
-  if (!Number.isFinite(n) || n < 0 || n > 100) return null
-  return n / 100
-}
-
-function toFormState(deal: DealBoardRow | null, defaultStageId: number): FormState {
-  if (!deal) {
-    return {
-      title: '',
-      stage_id: defaultStageId,
-      deal_type: 'production',
-      valueDollars: '',
-      expected_close_date: '',
-      source: '',
-      notes: '',
-      probabilityPercent: '',
-      lostReason: '',
-    }
-  }
-  return {
-    title: deal.title,
-    stage_id: deal.stage_id,
-    deal_type: deal.deal_type as DealType,
-    valueDollars: deal.value_cents ? centsToDollarInput(deal.value_cents) : '',
-    expected_close_date: deal.expected_close_date ?? '',
-    source: deal.source ?? '',
-    notes: deal.notes ?? '',
-    // Stored 0–1, shown as whole percent: people think in percentages, and
-    // numeric(3,2) can't hold more precision than that anyway.
-    probabilityPercent:
-      deal.probability_override === null ? '' : String(Math.round(deal.probability_override * 100)),
-    lostReason: deal.lost_reason ?? '',
-  }
-}
-
+/**
+ * Creating a deal only — editing happens on the deal's own page, where there's
+ * room for its activity, its links and its close history alongside the fields.
+ */
 export function DealFormModal({
   open,
-  deal,
   defaultStageId,
   onClose,
-  onSaved,
-  onSaveFailed,
+  onCreated,
   computeCreatePosition,
 }: DealFormModalProps) {
   const { showToast } = useToast()
   const { stages } = usePipelineStages()
-  const [values, setValues] = useState<FormState>(() => toFormState(deal, defaultStageId))
+  const [values, setValues] = useState<DealFormState>(() => emptyDealFormState(defaultStageId))
   const [organisation, setOrganisation] = useState<OrganisationOption | null>(null)
   const [contact, setContact] = useState<ContactOption | null>(null)
   const [saving, setSaving] = useState(false)
 
-  const selectedStage = stages.find((s) => s.id === values.stage_id)
-  const isLostStage = selectedStage?.is_lost ?? false
-  const stageDefaultPercent = selectedStage ? Math.round(selectedStage.probability * 100) : null
-
   useEffect(() => {
     if (!open) return
-    setValues(toFormState(deal, defaultStageId))
-    setOrganisation(deal ? { id: deal.organisation_id, name: deal.organisation_name, industry: null } : null)
-    setContact(
-      deal?.primary_contact_id && deal.contact_name
-        ? { id: deal.primary_contact_id, first_name: deal.contact_name, last_name: null }
-        : null,
-    )
-  }, [open, deal, defaultStageId])
+    setValues(emptyDealFormState(defaultStageId))
+    setOrganisation(null)
+    setContact(null)
+  }, [open, defaultStageId])
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     if (!organisation) return
 
-    const cleaned: DealFormValues = {
-      title: values.title.trim(),
-      organisation_id: organisation.id,
-      primary_contact_id: contact?.id ?? null,
-      stage_id: values.stage_id,
-      deal_type: values.deal_type,
-      value_cents: values.valueDollars.trim() ? dollarInputToCents(values.valueDollars) : 0,
-      expected_close_date: values.expected_close_date || null,
-      source: values.source.trim() || null,
-      notes: values.notes.trim() || null,
-      probability_override: percentToProbability(values.probabilityPercent),
-      // Only meaningful on a lost deal; moving off Lost clears it rather than
-      // leaving a stale reason attached to a live deal.
-      lost_reason: isLostStage ? values.lostReason.trim() || null : null,
-    }
-
-    if (deal) {
-      onSaved({
-        ...deal,
-        ...cleaned,
-        organisation_name: organisation.name,
-        contact_name: contact ? contact.first_name : null,
-      })
-      updateDeal(deal.id, cleaned)
-        .then(() => showToast('Deal updated'))
-        .catch((error: unknown) => {
-          onSaveFailed?.(deal)
-          showToast(error instanceof Error ? error.message : 'Failed to update deal', 'error')
-        })
-      return
-    }
+    const isLostStage = stages.find((s) => s.id === values.stage_id)?.is_lost ?? false
+    const cleaned = dealFormValues(values, organisation.id, contact?.id ?? null, isLostStage)
 
     setSaving(true)
     try {
       const created = await createDeal(cleaned, computeCreatePosition(cleaned.stage_id))
       showToast('Deal created')
-      onSaved(created)
+      onCreated(created)
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to create deal', 'error')
     } finally {
@@ -166,146 +63,17 @@ export function DealFormModal({
   }
 
   return (
-    <Modal open={open} onClose={onClose} title={deal ? 'Edit deal' : 'New deal'}>
+    <Modal open={open} onClose={onClose} title="New deal">
       <form onSubmit={handleSubmit} className="space-y-4">
-        <Field label="Title" required>
-          <input
-            required
-            value={values.title}
-            onChange={(e) => setValues((v) => ({ ...v, title: e.target.value }))}
-            className={inputClass}
-            style={inputStyle}
-          />
-        </Field>
-
-        <Field label="Organisation" required>
-          <Combobox<OrganisationOption>
-            value={organisation}
-            onChange={(next) => {
-              setOrganisation(next)
-              setContact(null)
-            }}
-            search={(q) => searchOrganisations(q)}
-            getLabel={(o) => o.name}
-            getKey={(o) => o.id}
-            placeholder="Search organisations…"
-          />
-        </Field>
-
-        <Field label="Primary contact">
-          <Combobox<ContactOption>
-            key={organisation?.id ?? 'no-org'}
-            value={contact}
-            onChange={setContact}
-            search={(q) => (organisation ? searchContactsForOrganisation(organisation.id, q) : Promise.resolve([]))}
-            getLabel={(c) => fullName(c.first_name, c.last_name)}
-            getKey={(c) => c.id}
-            placeholder={organisation ? 'Search contacts…' : 'Select an organisation first'}
-          />
-        </Field>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Stage" required>
-            <select
-              required
-              value={values.stage_id}
-              onChange={(e) => setValues((v) => ({ ...v, stage_id: Number(e.target.value) }))}
-              className={inputClass}
-              style={inputStyle}
-            >
-              {stages.map((stage) => (
-                <option key={stage.id} value={stage.id}>
-                  {stage.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Deal type" required>
-            <select
-              required
-              value={values.deal_type}
-              onChange={(e) => setValues((v) => ({ ...v, deal_type: e.target.value as DealType }))}
-              className={inputClass}
-              style={inputStyle}
-            >
-              {DEAL_TYPES.map((type) => (
-                <option key={type.value} value={type.value}>
-                  {type.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Field label="Value (AUD)">
-            <input
-              inputMode="decimal"
-              placeholder="0.00"
-              value={values.valueDollars}
-              onChange={(e) => setValues((v) => ({ ...v, valueDollars: e.target.value }))}
-              className={`tabular ${inputClass}`}
-              style={inputStyle}
-            />
-          </Field>
-          <Field label="Expected close date">
-            <input
-              type="date"
-              value={values.expected_close_date}
-              onChange={(e) => setValues((v) => ({ ...v, expected_close_date: e.target.value }))}
-              className={`tabular ${inputClass}`}
-              style={inputStyle}
-            />
-          </Field>
-        </div>
-
-        <Field label="Source">
-          <input
-            value={values.source}
-            onChange={(e) => setValues((v) => ({ ...v, source: e.target.value }))}
-            className={inputClass}
-            style={inputStyle}
-          />
-        </Field>
-
-        <Field label="Probability">
-          <input
-            type="number"
-            min={0}
-            max={100}
-            step={1}
-            value={values.probabilityPercent}
-            onChange={(e) => setValues((v) => ({ ...v, probabilityPercent: e.target.value }))}
-            placeholder={stageDefaultPercent === null ? 'Stage default' : `${stageDefaultPercent}% (stage default)`}
-            className={inputClass}
-            style={inputStyle}
-          />
-          <p className="text-xs" style={{ color: 'var(--text-subtle)' }}>
-            Overrides the stage's own probability in the weighted forecast. Leave blank to use the stage default.
-          </p>
-        </Field>
-
-        {isLostStage && (
-          <Field label="Lost reason">
-            <input
-              value={values.lostReason}
-              onChange={(e) => setValues((v) => ({ ...v, lostReason: e.target.value }))}
-              placeholder="Why was it lost?"
-              className={inputClass}
-              style={inputStyle}
-            />
-          </Field>
-        )}
-
-        <Field label="Notes">
-          <textarea
-            value={values.notes}
-            onChange={(e) => setValues((v) => ({ ...v, notes: e.target.value }))}
-            rows={3}
-            className={inputClass}
-            style={inputStyle}
-          />
-        </Field>
+        <DealFields
+          values={values}
+          onChange={(next) => setValues((v) => ({ ...v, ...next }))}
+          organisation={organisation}
+          onOrganisationChange={setOrganisation}
+          contact={contact}
+          onContactChange={setContact}
+          stages={stages}
+        />
 
         <div className="flex justify-end gap-2 pt-2">
           <button
@@ -327,22 +95,5 @@ export function DealFormModal({
         </div>
       </form>
     </Modal>
-  )
-}
-
-const inputClass = 'w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors duration-150'
-const inputStyle = { borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--text)' }
-
-/** The label is tied to its control by wrapping it, so screen readers (and
- * getByLabel) resolve the pair without every call site inventing an id. */
-function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
-  return (
-    <label className="block space-y-1.5">
-      <span className="block text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-        {label}
-        {required && ' *'}
-      </span>
-      {children}
-    </label>
   )
 }

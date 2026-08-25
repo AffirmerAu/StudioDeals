@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   CONTACTS_PAGE_SIZE,
   listContacts,
@@ -15,12 +15,12 @@ import { Pagination } from '@/components/Pagination'
 import { SortableHeader, type SortState } from '@/components/SortableHeader'
 import { Combobox } from '@/components/Combobox'
 import { ContactFormModal } from '@/components/contacts/ContactFormModal'
-import { ContactDetailDrawer } from '@/components/contacts/ContactDetailDrawer'
 import type { ContactListRow } from '@/types/crm'
+
+const BACK_TO_CONTACTS = { to: '/contacts', label: 'Contacts' }
 
 export function ContactsPage() {
   const navigate = useNavigate()
-  const { contactId } = useParams<{ contactId: string }>()
 
   const [search, setSearch] = useState('')
   const debouncedSearch = useDebouncedValue(search, 300)
@@ -34,7 +34,6 @@ export function ContactsPage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     setPage(0)
@@ -62,7 +61,7 @@ export function ContactsPage() {
     return () => {
       cancelled = true
     }
-  }, [debouncedSearch, organisation, tagId, sort, page, refreshKey])
+  }, [debouncedSearch, organisation, tagId, sort, page])
 
   const handleSort = (column: ContactSortColumn) => {
     setSort((current) =>
@@ -144,7 +143,7 @@ export function ContactsPage() {
               rows.map((contact) => (
                 <tr
                   key={contact.id}
-                  onClick={() => navigate(`/contacts/${contact.id}`)}
+                  onClick={() => navigate(`/contacts/${contact.id}`, { state: { from: BACK_TO_CONTACTS } })}
                   className="cursor-pointer border-b transition-colors duration-150 last:border-b-0"
                   style={{ borderColor: 'var(--border)' }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
@@ -187,19 +186,11 @@ export function ContactsPage() {
 
       <ContactFormModal
         open={addOpen}
-        contact={null}
         onClose={() => setAddOpen(false)}
-        onSaved={() => {
+        onCreated={(created) => {
           setAddOpen(false)
-          setPage(0)
-          setRefreshKey((k) => k + 1)
+          navigate(`/contacts/${created.id}`, { state: { from: BACK_TO_CONTACTS } })
         }}
-      />
-
-      <ContactDetailDrawer
-        contactId={contactId ?? null}
-        onClose={() => navigate('/contacts')}
-        onChanged={() => setRefreshKey((k) => k + 1)}
       />
     </div>
   )

@@ -24,7 +24,8 @@ export function NeedsAttentionList({ rows }: { rows: DealsNeedingAttentionRow[] 
           {rows.map((row) => (
             <li key={row.id}>
               <Link
-                to={`/pipeline?dealId=${row.id}`}
+                to={`/deals/${row.id}`}
+                state={{ from: { to: '/', label: 'Dashboard' } }}
                 className="block rounded-lg border px-3 py-2.5 text-sm transition-colors duration-150"
                 style={{ borderColor: 'var(--border)' }}
               >
