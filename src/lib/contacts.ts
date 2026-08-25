@@ -58,6 +58,33 @@ export async function listContacts(params: ListContactsParams): Promise<ListCont
   return { rows: (data ?? []) as ContactListRow[], total: count ?? 0 }
 }
 
+export interface ContactOption {
+  id: string
+  first_name: string
+  last_name: string | null
+}
+
+export async function searchContactsForOrganisation(
+  organisationId: string,
+  query: string,
+  limit = 20,
+): Promise<ContactOption[]> {
+  let request = supabase
+    .from('contacts')
+    .select('id, first_name, last_name')
+    .eq('organisation_id', organisationId)
+    .order('first_name', { ascending: true })
+
+  if (query.trim()) {
+    const cleaned = sanitizeForOrFilter(query)
+    request = request.or(`first_name.ilike.%${cleaned}%,last_name.ilike.%${cleaned}%`)
+  }
+
+  const { data, error } = await request.limit(limit)
+  if (error) throw error
+  return data ?? []
+}
+
 export async function listContactsForOrganisation(organisationId: string): Promise<ContactRow[]> {
   const { data, error } = await supabase
     .from('contacts')

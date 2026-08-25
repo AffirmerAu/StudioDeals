@@ -42,3 +42,23 @@ export type ContactListRow = Omit<RawContactListRow, 'id' | 'first_name' | 'is_p
   // actually null, unlike every other view column.
   is_stale: boolean
 }
+
+// These three views all use inner joins and GROUP BY/boolean-expression
+// columns only (no left joins introducing genuine optionality, unlike the
+// two views above) — per their definitions in 001_initial_schema.sql every
+// column is guaranteed non-null for any row the view actually returns, so
+// the whole row narrows cleanly rather than picking individual columns.
+type RawPipelineForecastRow = Database['crm']['Views']['v_pipeline_forecast']['Row']
+export type PipelineForecastRow = {
+  [K in keyof RawPipelineForecastRow]: NonNullable<RawPipelineForecastRow[K]>
+}
+
+type RawDealsNeedingAttentionRow = Database['crm']['Views']['v_deals_needing_attention']['Row']
+export type DealsNeedingAttentionRow = {
+  [K in keyof RawDealsNeedingAttentionRow]: NonNullable<RawDealsNeedingAttentionRow[K]>
+}
+
+type RawPendingHandoffRow = Database['crm']['Views']['v_pending_handoff']['Row']
+export type PendingHandoffRow = {
+  [K in keyof RawPendingHandoffRow]: NonNullable<RawPendingHandoffRow[K]>
+}
