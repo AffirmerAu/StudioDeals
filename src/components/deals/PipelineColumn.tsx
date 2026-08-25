@@ -11,9 +11,20 @@ interface PipelineColumnProps {
   deals: DealBoardRow[]
   onCardClick: (deal: DealBoardRow) => void
   onAddClick: (stageId: number) => void
+  onViewDeal: (deal: DealBoardRow) => void
+  onMarkWon: (deal: DealBoardRow) => void
+  onMarkLost: (deal: DealBoardRow) => void
 }
 
-export function PipelineColumn({ stage, deals, onCardClick, onAddClick }: PipelineColumnProps) {
+export function PipelineColumn({
+  stage,
+  deals,
+  onCardClick,
+  onAddClick,
+  onViewDeal,
+  onMarkWon,
+  onMarkLost,
+}: PipelineColumnProps) {
   const { setNodeRef } = useDroppable({ id: stage.id })
   const totalCents = deals.reduce((sum, deal) => sum + deal.value_cents, 0)
 
@@ -33,7 +44,19 @@ export function PipelineColumn({ stage, deals, onCardClick, onAddClick }: Pipeli
       >
         <SortableContext items={deals.map((d) => d.id)} strategy={verticalListSortingStrategy}>
           {deals.map((deal) => (
-            <DealCard key={deal.id} deal={deal} onClick={() => onCardClick(deal)} />
+            <DealCard
+              key={deal.id}
+              deal={deal}
+              onClick={() => onCardClick(deal)}
+              menu={{
+                onEdit: () => onCardClick(deal),
+                onView: () => onViewDeal(deal),
+                onMarkWon: () => onMarkWon(deal),
+                onMarkLost: () => onMarkLost(deal),
+                canMarkWon: !stage.is_won,
+                canMarkLost: !stage.is_lost,
+              }}
+            />
           ))}
         </SortableContext>
 

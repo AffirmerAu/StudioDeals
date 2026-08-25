@@ -18,9 +18,10 @@ const TYPE_LABEL: Record<ActivityRow['type'], string> = {
 interface ActivityTimelineProps {
   organisationId?: string
   contactId?: string
+  dealId?: string
 }
 
-export function ActivityTimeline({ organisationId, contactId }: ActivityTimelineProps) {
+export function ActivityTimeline({ organisationId, contactId, dealId }: ActivityTimelineProps) {
   const [rows, setRows] = useState<ActivityRow[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
@@ -29,7 +30,7 @@ export function ActivityTimeline({ organisationId, contactId }: ActivityTimeline
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    listActivities({ organisationId, contactId, offset: 0 })
+    listActivities({ organisationId, contactId, dealId, offset: 0 })
       .then((page) => {
         if (cancelled) return
         setRows(page.rows)
@@ -41,11 +42,11 @@ export function ActivityTimeline({ organisationId, contactId }: ActivityTimeline
     return () => {
       cancelled = true
     }
-  }, [organisationId, contactId])
+  }, [organisationId, contactId, dealId])
 
   const loadMore = () => {
     setLoadingMore(true)
-    listActivities({ organisationId, contactId, offset: rows.length })
+    listActivities({ organisationId, contactId, dealId, offset: rows.length })
       .then((page) => {
         setRows((current) => [...current, ...page.rows])
         setHasMore(page.hasMore)

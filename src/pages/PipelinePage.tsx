@@ -19,6 +19,7 @@ import {
   computeBoardPosition,
   listDealsForBoard,
   markDealHandedOff,
+  setDealStage,
   updateDealPosition,
   type DealBoardRow,
 } from '@/lib/deals'
@@ -27,7 +28,9 @@ import { EmptyState } from '@/components/EmptyState'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { PipelineColumn } from '@/components/deals/PipelineColumn'
 import { DealCardContent } from '@/components/deals/DealCard'
+import { DealDetailDrawer } from '@/components/deals/DealDetailDrawer'
 import { DealFormModal } from '@/components/deals/DealFormModal'
+import type { PipelineStageRow } from '@/types/crm'
 
 const DEAL_TYPE_OPTIONS = [
   { value: '', label: 'All deal types' },
@@ -36,6 +39,13 @@ const DEAL_TYPE_OPTIONS = [
   { value: 'retainer', label: 'Retainer' },
   { value: 'other', label: 'Other' },
 ]
+
+const SHOW_WON_KEY = 'studiodeals-pipeline-show-won'
+const SHOW_LOST_KEY = 'studiodeals-pipeline-show-lost'
+
+function getStoredFlag(key: string): boolean {
+  return localStorage.getItem(key) === 'true'
+}
 
 export function PipelinePage() {
   const { showToast } = useToast()
@@ -48,10 +58,16 @@ export function PipelinePage() {
   const debouncedSearch = useDebouncedValue(search, 300)
   const [dealType, setDealType] = useState('')
 
+  // Won and Lost columns are closed by default — they only grow, and the board
+  // is about work in flight. The preference sticks per browser.
+  const [showWon, setShowWon] = useState(() => getStoredFlag(SHOW_WON_KEY))
+  const [showLost, setShowLost] = useState(() => getStoredFlag(SHOW_LOST_KEY))
+
   const [activeDeal, setActiveDeal] = useState<DealBoardRow | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingDeal, setEditingDeal] = useState<DealBoardRow | null>(null)
   const [createStageId, setCreateStageId] = useState<number | null>(null)
+  const [viewingDeal, setViewingDeal] = useState<DealBoardRow | null>(null)
 
   const [handoffDeal, setHandoffDeal] = useState<DealBoardRow | null>(null)
   const [handoffBusy, setHandoffBusy] = useState(false)
@@ -118,6 +134,25 @@ export function PipelinePage() {
     return map
   }, [filteredDeals, stages])
 
+  const wonStage = stages.find((s) => s.is_won)
+  const lostStage = stages.find((s) => s.is_lost)
+
+  const visibleStages = stages.filter((stage) => {
+    if (stage.is_won) return showWon
+    if (stage.is_lost) return showLost
+    return true
+  })
+
+  const toggleWon = (next: boolean) => {
+    setShowWon(next)
+    localStorage.setItem(SHOW_WON_KEY, String(next))
+  }
+
+  const toggleLost = (next: boolean) => {
+    setShowLost(next)
+    localStorage.setItem(SHOW_LOST_KEY, String(next))
+  }
+
   const isWonStage = (stageId: number) => stages.find((s) => s.id === stageId)?.is_won ?? false
 
   // Only prompt for a genuine transition into Won — not a reorder within
@@ -180,6 +215,29 @@ export function PipelinePage() {
     )
   }
 
+  // Won/Lost from the card menu. Unlike a drag this can't be applied
+  // optimistically: the close-stamp trigger fills in won_at/lost_at server-side,
+  // so the saved row is read back. The destination column is revealed if it was
+  // collapsed, otherwise the card would appear to vanish.
+  const handleMarkStage = async (deal: DealBoardRow, stage: PipelineStageRow) => {
+    const destDeals = (columns.get(stage.id) ?? []).filter((d) => d.id !== deal.id)
+    const boardPosition = computeBoardPosition(destDeals, destDeals.length)
+    const previousStageId = deal.stage_id
+
+    if (stage.is_won) toggleWon(true)
+    if (stage.is_lost) toggleLost(true)
+
+    try {
+      const saved = await setDealStage(deal.id, { stage_id: stage.id, board_position: boardPosition })
+      setDeals((current) => current.map((d) => (d.id === saved.id ? saved : d)))
+      setViewingDeal((current) => (current?.id === saved.id ? saved : current))
+      showToast(`Marked as ${stage.label}`)
+      maybePromptHandoff(previousStageId, saved)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : `Failed to mark as ${stage.label}`, 'error')
+    }
+  }
+
   const handleConfirmHandoff = async () => {
     if (!handoffDeal) return
     setHandoffBusy(true)
@@ -232,6 +290,25 @@ export function PipelinePage() {
             </option>
           ))}
         </select>
+
+        {wonStage && (
+          <ColumnToggle
+            label={wonStage.label}
+            count={(columns.get(wonStage.id) ?? []).length}
+            active={showWon}
+            color="var(--color-stage-won)"
+            onToggle={() => toggleWon(!showWon)}
+          />
+        )}
+        {lostStage && (
+          <ColumnToggle
+            label={lostStage.label}
+            count={(columns.get(lostStage.id) ?? []).length}
+            active={showLost}
+            color="var(--color-stage-lost)"
+            onToggle={() => toggleLost(!showLost)}
+          />
+        )}
       </div>
 
       {(loading || stagesLoading) && (
@@ -257,13 +334,16 @@ export function PipelinePage() {
           onDragCancel={() => setActiveDeal(null)}
         >
           <div className="mt-5 flex flex-1 gap-4 overflow-x-auto pb-4">
-            {stages.map((stage) => (
+            {visibleStages.map((stage) => (
               <PipelineColumn
                 key={stage.id}
                 stage={stage}
                 deals={columns.get(stage.id) ?? []}
                 onCardClick={openEditModal}
                 onAddClick={openCreateModal}
+                onViewDeal={setViewingDeal}
+                onMarkWon={(deal) => wonStage && void handleMarkStage(deal, wonStage)}
+                onMarkLost={(deal) => lostStage && void handleMarkStage(deal, lostStage)}
               />
             ))}
           </div>
@@ -282,12 +362,20 @@ export function PipelinePage() {
             const exists = current.some((d) => d.id === saved.id)
             return exists ? current.map((d) => (d.id === saved.id ? saved : d)) : [...current, saved]
           })
+          setViewingDeal((current) => (current?.id === saved.id ? saved : current))
           setModalOpen(false)
           maybePromptHandoff(editingDeal?.stage_id ?? null, saved)
         }}
         onSaveFailed={(previous) => {
           setDeals((current) => current.map((d) => (d.id === previous.id ? previous : d)))
         }}
+      />
+
+      <DealDetailDrawer
+        deal={viewingDeal}
+        stages={stages}
+        onClose={() => setViewingDeal(null)}
+        onEdit={openEditModal}
       />
 
       <ConfirmDialog
@@ -304,5 +392,39 @@ export function PipelinePage() {
         onClose={() => setHandoffDeal(null)}
       />
     </div>
+  )
+}
+
+function ColumnToggle({
+  label,
+  count,
+  active,
+  color,
+  onToggle,
+}: {
+  label: string
+  count: number
+  active: boolean
+  color: string
+  onToggle: () => void
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      aria-pressed={active}
+      className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition-colors duration-150"
+      style={{
+        borderColor: active ? color : 'var(--border)',
+        background: active ? 'var(--surface-hover)' : 'var(--surface-raised)',
+        color: active ? color : 'var(--text-muted)',
+      }}
+    >
+      <span className="size-1.5 rounded-lg" style={{ background: active ? color : 'var(--text-subtle)' }} />
+      {active ? 'Hide' : 'Show'} {label}
+      <span className="tabular text-xs" style={{ color: 'var(--text-subtle)' }}>
+        {count}
+      </span>
+    </button>
   )
 }

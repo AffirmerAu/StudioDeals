@@ -14,6 +14,14 @@ function Icon(props: SVGProps<SVGSVGElement>) {
   )
 }
 
+export function ChevronDownIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M5.5 8 10 12.5 14.5 8" />
+    </Icon>
+  )
+}
+
 export function DashboardIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <Icon {...props}>
