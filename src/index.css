@@ -24,6 +24,15 @@
   --color-stage-verbal:   #f59e0b;
   --color-stage-won:      #10b981;
   --color-stage-lost:     #64748b;
+
+  /* Pipeline phase tints. Coarser than the per-stage colours above: they wash
+     the board's column headers so the shape of the pipeline — early, active,
+     won, lost — reads before any label does. Stage identity still comes from
+     the badge, so two columns sharing a phase stay distinguishable. */
+  --color-phase-early:  #3385d9;
+  --color-phase-active: #f59e0b;
+  --color-phase-won:    #10b981;
+  --color-phase-lost:   #ef4444;
 }
 
 @layer base {

@@ -9,6 +9,7 @@ import {
 import type { OrganisationSummaryRow } from '@/types/crm'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 import { formatCents } from '@/lib/format'
+import { CompanyLogo } from '@/components/CompanyLogo'
 import { EmptyState } from '@/components/EmptyState'
 import { SkeletonTableRows } from '@/components/Skeleton'
 import { Pagination } from '@/components/Pagination'
@@ -148,7 +149,12 @@ export function OrganisationsPage() {
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
                 >
-                  <td className="px-4 py-3 font-medium">{org.name}</td>
+                  <td className="px-4 py-3 font-medium">
+                    <div className="flex items-center gap-2">
+                      <CompanyLogo name={org.name} website={org.website} size={20} />
+                      {org.name}
+                    </div>
+                  </td>
                   <td className="px-4 py-3" style={{ color: 'var(--text-muted)' }}>
                     {org.industry ?? '—'}
                   </td>

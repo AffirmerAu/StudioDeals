@@ -1,5 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { formatCents, formatDate } from '@/lib/format'
+import { CompanyLogo } from '@/components/CompanyLogo'
 import { DealCardMenu, type DealCardMenuProps } from '@/components/deals/DealCardMenu'
 import type { DealBoardRow } from '@/lib/deals'
 
@@ -26,9 +27,12 @@ export function DealCardContent({ deal, onClick, menu }: DealCardContentProps) {
         <p className="truncate font-medium">{deal.title}</p>
         {menu && <DealCardMenu {...menu} />}
       </div>
-      <p className="mt-1 truncate text-xs" style={{ color: 'var(--text-muted)' }}>
-        {deal.organisation_name}
-      </p>
+      <div className="mt-1.5 flex items-center gap-1.5">
+        <CompanyLogo name={deal.organisation_name} website={deal.organisation_website} size={20} />
+        <p className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
+          {deal.organisation_name}
+        </p>
+      </div>
       <div className="mt-2 flex items-center justify-between">
         <span className="tabular text-xs" style={{ color: 'var(--text-subtle)' }}>
           {formatDate(deal.expected_close_date)}

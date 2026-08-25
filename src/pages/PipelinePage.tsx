@@ -12,7 +12,7 @@ import {
   type DragStartEvent,
 } from '@dnd-kit/core'
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { usePipelineStages } from '@/lib/pipeline-stages'
+import { stagePhaseColor, usePipelineStages } from '@/lib/pipeline-stages'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 import { useToast } from '@/lib/toast-context'
 import {
@@ -338,6 +338,7 @@ export function PipelinePage() {
               <PipelineColumn
                 key={stage.id}
                 stage={stage}
+                phaseColor={stagePhaseColor(stage, stages)}
                 deals={columns.get(stage.id) ?? []}
                 onCardClick={openEditModal}
                 onAddClick={openCreateModal}
