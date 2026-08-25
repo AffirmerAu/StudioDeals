@@ -43,7 +43,8 @@ export function Sidebar() {
         className="hidden md:flex md:flex-col md:fixed md:inset-y-0 md:left-0 md:w-56 border-r"
         style={{ borderColor: 'var(--border)', background: 'var(--surface-raised)' }}
       >
-        <div className="px-5 py-5">
+        <div className="flex items-center gap-2 px-5 py-5">
+          <img src="/assets/studiodeals/icon-rounded.svg" alt="" className="size-6 rounded-lg" />
           <span className="text-sm font-semibold tracking-tight">StudioDeals</span>
         </div>
 
