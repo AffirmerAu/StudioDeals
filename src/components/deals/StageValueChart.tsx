@@ -12,11 +12,16 @@ interface StageValueChartProps {
 
 export function StageValueChart({ stages, totals }: StageValueChartProps) {
   const byStage = new Map(totals.map((t) => [t.stageId, t]))
-  const data = stages.map((stage) => ({
-    key: stage.key,
-    label: stage.label,
-    value: byStage.get(stage.id)?.valueCents ?? 0,
-  }))
+  // Won and Lost are excluded: they only accumulate, so their bars dwarf the
+  // live stages and say nothing about the pipeline. This also makes the chart
+  // agree with the "Open pipeline value" tile beside it, which is open-only.
+  const data = stages
+    .filter((stage) => !stage.is_won && !stage.is_lost)
+    .map((stage) => ({
+      key: stage.key,
+      label: stage.label,
+      value: byStage.get(stage.id)?.valueCents ?? 0,
+    }))
 
   return (
     <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', background: 'var(--surface-raised)' }}>

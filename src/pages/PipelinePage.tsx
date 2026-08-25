@@ -19,6 +19,7 @@ import {
   computeBoardPosition,
   deleteDeal,
   listDealsForBoard,
+  setDealLostReason,
   markDealHandedOff,
   setDealStage,
   updateDealPosition,
@@ -27,6 +28,7 @@ import {
 import { SkeletonBlock } from '@/components/Skeleton'
 import { EmptyState } from '@/components/EmptyState'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import { LostReasonDialog } from '@/components/deals/LostReasonDialog'
 import { PipelineColumn } from '@/components/deals/PipelineColumn'
 import { DealCardContent } from '@/components/deals/DealCard'
 import { DealDetailDrawer } from '@/components/deals/DealDetailDrawer'
@@ -74,6 +76,10 @@ export function PipelinePage() {
   const [handoffBusy, setHandoffBusy] = useState(false)
   const [deletingDeal, setDeletingDeal] = useState<DealBoardRow | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
+  // Two shapes of "mark lost": from the menu the stage move is still pending,
+  // from a drag it has already happened and only the reason is outstanding.
+  const [lostPrompt, setLostPrompt] = useState<{ deal: DealBoardRow; stage: PipelineStageRow | null } | null>(null)
+  const [lostBusy, setLostBusy] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -170,6 +176,15 @@ export function PipelinePage() {
     setHandoffDeal(deal)
   }
 
+  const isLostStage = (stageId: number) => stages.find((s) => s.id === stageId)?.is_lost ?? false
+
+  /** Only on a genuine move into Lost — not a reorder within it. */
+  const maybePromptLostReason = (previousStageId: number, deal: DealBoardRow) => {
+    if (!isLostStage(deal.stage_id)) return
+    if (isLostStage(previousStageId)) return
+    setLostPrompt({ deal, stage: null })
+  }
+
   const openCreateModal = (stageId: number) => {
     setEditingDeal(null)
     setCreateStageId(stageId)
@@ -209,6 +224,7 @@ export function PipelinePage() {
     const updatedDeal = { ...dragged, stage_id: destStageId, board_position: newPosition }
     setDeals((current) => current.map((d) => (d.id === dragged.id ? updatedDeal : d)))
     maybePromptHandoff(dragged.stage_id, updatedDeal)
+    maybePromptLostReason(dragged.stage_id, updatedDeal)
 
     updateDealPosition(dragged.id, { stage_id: destStageId, board_position: newPosition }).catch(
       (error: unknown) => {
@@ -222,7 +238,7 @@ export function PipelinePage() {
   // optimistically: the close-stamp trigger fills in won_at/lost_at server-side,
   // so the saved row is read back. The destination column is revealed if it was
   // collapsed, otherwise the card would appear to vanish.
-  const handleMarkStage = async (deal: DealBoardRow, stage: PipelineStageRow) => {
+  const handleMarkStage = async (deal: DealBoardRow, stage: PipelineStageRow, lostReason?: string | null) => {
     const destDeals = (columns.get(stage.id) ?? []).filter((d) => d.id !== deal.id)
     const boardPosition = computeBoardPosition(destDeals, destDeals.length)
     const previousStageId = deal.stage_id
@@ -231,13 +247,37 @@ export function PipelinePage() {
     if (stage.is_lost) toggleLost(true)
 
     try {
-      const saved = await setDealStage(deal.id, { stage_id: stage.id, board_position: boardPosition })
+      const saved = await setDealStage(deal.id, {
+        stage_id: stage.id,
+        board_position: boardPosition,
+        ...(stage.is_lost ? { lost_reason: lostReason ?? null } : {}),
+      })
       setDeals((current) => current.map((d) => (d.id === saved.id ? saved : d)))
       setViewingDeal((current) => (current?.id === saved.id ? saved : current))
       showToast(`Marked as ${stage.label}`)
       maybePromptHandoff(previousStageId, saved)
     } catch (error) {
       showToast(error instanceof Error ? error.message : `Failed to mark as ${stage.label}`, 'error')
+    }
+  }
+
+  const handleConfirmLost = async (reason: string | null) => {
+    if (!lostPrompt) return
+    setLostBusy(true)
+    try {
+      if (lostPrompt.stage) {
+        // Menu path — the stage change hasn't happened yet.
+        await handleMarkStage(lostPrompt.deal, lostPrompt.stage, reason)
+      } else {
+        // Drag path — already in Lost, so only the reason is left to record.
+        const saved = await setDealLostReason(lostPrompt.deal.id, reason)
+        setDeals((current) => current.map((d) => (d.id === saved.id ? saved : d)))
+      }
+      setLostPrompt(null)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to record the reason', 'error')
+    } finally {
+      setLostBusy(false)
     }
   }
 
@@ -363,7 +403,7 @@ export function PipelinePage() {
                 onAddClick={openCreateModal}
                 onViewDeal={setViewingDeal}
                 onMarkWon={(deal) => wonStage && void handleMarkStage(deal, wonStage)}
-                onMarkLost={(deal) => lostStage && void handleMarkStage(deal, lostStage)}
+                onMarkLost={(deal) => lostStage && setLostPrompt({ deal, stage: lostStage })}
                 onDeleteDeal={setDeletingDeal}
               />
             ))}
@@ -398,6 +438,15 @@ export function PipelinePage() {
         onClose={() => setViewingDeal(null)}
         onEdit={openEditModal}
         onDelete={setDeletingDeal}
+      />
+
+      <LostReasonDialog
+        open={lostPrompt !== null}
+        dealTitle={lostPrompt?.deal.title ?? ''}
+        initialReason={lostPrompt?.deal.lost_reason}
+        busy={lostBusy}
+        onConfirm={handleConfirmLost}
+        onClose={() => setLostPrompt(null)}
       />
 
       <ConfirmDialog
