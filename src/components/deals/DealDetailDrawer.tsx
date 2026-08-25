@@ -19,9 +19,10 @@ interface DealDetailDrawerProps {
   stages: PipelineStageRow[]
   onClose: () => void
   onEdit: (deal: DealBoardRow) => void
+  onDelete: (deal: DealBoardRow) => void
 }
 
-export function DealDetailDrawer({ deal, stages, onClose, onEdit }: DealDetailDrawerProps) {
+export function DealDetailDrawer({ deal, stages, onClose, onEdit, onDelete }: DealDetailDrawerProps) {
   const stage = deal ? stages.find((s) => s.id === deal.stage_id) : undefined
 
   return (
@@ -30,14 +31,24 @@ export function DealDetailDrawer({ deal, stages, onClose, onEdit }: DealDetailDr
         <div className="space-y-6">
           <div className="flex items-center justify-between gap-3">
             {stage ? <StageBadge stageKey={stage.key} label={stage.label} /> : <span />}
-            <button
-              type="button"
-              onClick={() => onEdit(deal)}
-              className="rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors duration-150"
-              style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
-            >
-              Edit
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => onEdit(deal)}
+                className="rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors duration-150"
+                style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => onDelete(deal)}
+                className="rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors duration-150"
+                style={{ borderColor: 'var(--border)', color: 'var(--color-stage-lost)' }}
+              >
+                Delete
+              </button>
+            </div>
           </div>
 
           <dl className="space-y-2.5 text-sm">

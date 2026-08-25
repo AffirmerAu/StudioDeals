@@ -8,6 +8,7 @@ export interface DealCardMenuProps {
   onView: () => void
   onMarkWon: () => void
   onMarkLost: () => void
+  onDelete: () => void
   /** Hidden when the deal already sits in that stage — nothing to mark. */
   canMarkWon: boolean
   canMarkLost: boolean
@@ -15,7 +16,15 @@ export interface DealCardMenuProps {
 
 const MENU_WIDTH = 168
 
-export function DealCardMenu({ onEdit, onView, onMarkWon, onMarkLost, canMarkWon, canMarkLost }: DealCardMenuProps) {
+export function DealCardMenu({
+  onEdit,
+  onView,
+  onMarkWon,
+  onMarkLost,
+  onDelete,
+  canMarkWon,
+  canMarkLost,
+}: DealCardMenuProps) {
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState({ top: 0, left: 0 })
   const triggerRef = useRef<HTMLButtonElement>(null)
@@ -113,8 +122,13 @@ export function DealCardMenu({ onEdit, onView, onMarkWon, onMarkLost, canMarkWon
             {(canMarkWon || canMarkLost) && (
               <div className="my-1 border-t" style={{ borderColor: 'var(--border)' }} />
             )}
-            {canMarkWon && <MenuItem label="Won" color="var(--color-stage-won)" onClick={run(onMarkWon)} />}
-            {canMarkLost && <MenuItem label="Lost" color="var(--color-stage-lost)" onClick={run(onMarkLost)} />}
+            {canMarkWon && <MenuItem label="Won" color="var(--color-stage-won)" dot onClick={run(onMarkWon)} />}
+            {canMarkLost && <MenuItem label="Lost" color="var(--color-stage-lost)" dot onClick={run(onMarkLost)} />}
+
+            <div className="my-1 border-t" style={{ borderColor: 'var(--border)' }} />
+            {/* No dot, so it doesn't read as another stage alongside Lost,
+                which now shares its red. */}
+            <MenuItem label="Delete" color="var(--color-stage-lost)" onClick={run(onDelete)} />
           </div>,
           document.body,
         )}
@@ -122,7 +136,17 @@ export function DealCardMenu({ onEdit, onView, onMarkWon, onMarkLost, canMarkWon
   )
 }
 
-function MenuItem({ label, onClick, color }: { label: string; onClick: () => void; color?: string }) {
+function MenuItem({
+  label,
+  onClick,
+  color,
+  dot = false,
+}: {
+  label: string
+  onClick: () => void
+  color?: string
+  dot?: boolean
+}) {
   return (
     <button
       type="button"
@@ -133,7 +157,7 @@ function MenuItem({ label, onClick, color }: { label: string; onClick: () => voi
       onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
       onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
     >
-      {color && <span className="size-1.5 shrink-0 rounded-lg" style={{ background: color }} />}
+      {dot && color && <span className="size-1.5 shrink-0 rounded-lg" style={{ background: color }} />}
       {label}
     </button>
   )

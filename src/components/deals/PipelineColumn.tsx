@@ -14,6 +14,7 @@ interface PipelineColumnProps {
   onViewDeal: (deal: DealBoardRow) => void
   onMarkWon: (deal: DealBoardRow) => void
   onMarkLost: (deal: DealBoardRow) => void
+  onDeleteDeal: (deal: DealBoardRow) => void
 }
 
 export function PipelineColumn({
@@ -24,6 +25,7 @@ export function PipelineColumn({
   onViewDeal,
   onMarkWon,
   onMarkLost,
+  onDeleteDeal,
 }: PipelineColumnProps) {
   const { setNodeRef } = useDroppable({ id: stage.id })
   const totalCents = deals.reduce((sum, deal) => sum + deal.value_cents, 0)
@@ -63,6 +65,7 @@ export function PipelineColumn({
                 onView: () => onViewDeal(deal),
                 onMarkWon: () => onMarkWon(deal),
                 onMarkLost: () => onMarkLost(deal),
+                onDelete: () => onDeleteDeal(deal),
                 canMarkWon: !stage.is_won,
                 canMarkLost: !stage.is_lost,
               }}

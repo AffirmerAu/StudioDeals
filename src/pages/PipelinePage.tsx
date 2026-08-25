@@ -17,6 +17,7 @@ import { useDebouncedValue } from '@/lib/use-debounced-value'
 import { useToast } from '@/lib/toast-context'
 import {
   computeBoardPosition,
+  deleteDeal,
   listDealsForBoard,
   markDealHandedOff,
   setDealStage,
@@ -71,6 +72,8 @@ export function PipelinePage() {
 
   const [handoffDeal, setHandoffDeal] = useState<DealBoardRow | null>(null)
   const [handoffBusy, setHandoffBusy] = useState(false)
+  const [deletingDeal, setDeletingDeal] = useState<DealBoardRow | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -238,6 +241,23 @@ export function PipelinePage() {
     }
   }
 
+  const handleConfirmDelete = async () => {
+    if (!deletingDeal) return
+    setDeleteBusy(true)
+    try {
+      await deleteDeal(deletingDeal.id)
+      setDeals((current) => current.filter((d) => d.id !== deletingDeal.id))
+      // Whatever was open about this deal is now about nothing.
+      setViewingDeal((current) => (current?.id === deletingDeal.id ? null : current))
+      showToast('Deal deleted')
+      setDeletingDeal(null)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to delete deal', 'error')
+    } finally {
+      setDeleteBusy(false)
+    }
+  }
+
   const handleConfirmHandoff = async () => {
     if (!handoffDeal) return
     setHandoffBusy(true)
@@ -344,6 +364,7 @@ export function PipelinePage() {
                 onViewDeal={setViewingDeal}
                 onMarkWon={(deal) => wonStage && void handleMarkStage(deal, wonStage)}
                 onMarkLost={(deal) => lostStage && void handleMarkStage(deal, lostStage)}
+                onDeleteDeal={setDeletingDeal}
               />
             ))}
           </div>
@@ -376,6 +397,22 @@ export function PipelinePage() {
         stages={stages}
         onClose={() => setViewingDeal(null)}
         onEdit={openEditModal}
+        onDelete={setDeletingDeal}
+      />
+
+      <ConfirmDialog
+        open={deletingDeal !== null}
+        title="Delete deal"
+        message={
+          deletingDeal
+            ? `Delete "${deletingDeal.title}"? Any activities logged against it are deleted too. This can't be undone.`
+            : ''
+        }
+        confirmLabel="Delete"
+        danger
+        busy={deleteBusy}
+        onConfirm={handleConfirmDelete}
+        onClose={() => setDeletingDeal(null)}
       />
 
       <ConfirmDialog
