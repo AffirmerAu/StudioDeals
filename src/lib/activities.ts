@@ -11,10 +11,16 @@ export interface ActivityPage {
 interface ListActivitiesParams {
   organisationId?: string
   contactId?: string
+  dealId?: string
   offset: number
 }
 
-export async function listActivities({ organisationId, contactId, offset }: ListActivitiesParams): Promise<ActivityPage> {
+export async function listActivities({
+  organisationId,
+  contactId,
+  dealId,
+  offset,
+}: ListActivitiesParams): Promise<ActivityPage> {
   let query = supabase
     .from('activities')
     .select('*')
@@ -23,6 +29,7 @@ export async function listActivities({ organisationId, contactId, offset }: List
 
   if (organisationId) query = query.eq('organisation_id', organisationId)
   if (contactId) query = query.eq('contact_id', contactId)
+  if (dealId) query = query.eq('deal_id', dealId)
 
   const { data, error } = await query
   if (error) throw error

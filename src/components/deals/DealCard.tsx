@@ -1,16 +1,19 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { formatCents, formatDate } from '@/lib/format'
+import { DealCardMenu, type DealCardMenuProps } from '@/components/deals/DealCardMenu'
 import type { DealBoardRow } from '@/lib/deals'
 
 interface DealCardContentProps {
   deal: DealBoardRow
   onClick?: () => void
+  /** Omitted by DragOverlay, which renders a plain visual copy with no actions. */
+  menu?: DealCardMenuProps
 }
 
 /** Pure presentational card — used directly by DragOverlay, which needs a
  * plain visual copy rather than a second `useSortable` registration for the
  * same id. */
-export function DealCardContent({ deal, onClick }: DealCardContentProps) {
+export function DealCardContent({ deal, onClick, menu }: DealCardContentProps) {
   return (
     <div
       onClick={onClick}
@@ -19,7 +22,10 @@ export function DealCardContent({ deal, onClick }: DealCardContentProps) {
       onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-brand-500)')}
       onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
     >
-      <p className="truncate font-medium">{deal.title}</p>
+      <div className="flex items-start justify-between gap-1.5">
+        <p className="truncate font-medium">{deal.title}</p>
+        {menu && <DealCardMenu {...menu} />}
+      </div>
       <p className="mt-1 truncate text-xs" style={{ color: 'var(--text-muted)' }}>
         {deal.organisation_name}
       </p>
@@ -29,6 +35,11 @@ export function DealCardContent({ deal, onClick }: DealCardContentProps) {
         </span>
         <span className="tabular text-sm font-medium">{formatCents(deal.value_cents)}</span>
       </div>
+      {deal.handed_off_at && (
+        <p className="mt-1.5 text-xs font-medium" style={{ color: 'var(--color-stage-won)' }}>
+          Sent to StudioTime
+        </p>
+      )}
     </div>
   )
 }
@@ -36,9 +47,10 @@ export function DealCardContent({ deal, onClick }: DealCardContentProps) {
 interface DealCardProps {
   deal: DealBoardRow
   onClick: () => void
+  menu: DealCardMenuProps
 }
 
-export function DealCard({ deal, onClick }: DealCardProps) {
+export function DealCard({ deal, onClick, menu }: DealCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({ id: deal.id })
 
   const style = {
@@ -48,7 +60,7 @@ export function DealCard({ deal, onClick }: DealCardProps) {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <DealCardContent deal={deal} onClick={onClick} />
+      <DealCardContent deal={deal} onClick={onClick} menu={menu} />
     </div>
   )
 }

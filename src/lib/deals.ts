@@ -103,3 +103,38 @@ export async function updateDeal(id: string, values: DealFormValues): Promise<De
   if (error) throw error
   return flattenBoardRow(data)
 }
+
+// Moving a deal into a won/lost stage is a plain stage_id write — the
+// `trg_deals_close_stamps` trigger in 001_initial_schema.sql sets (and clears)
+// won_at/lost_at from the stage's is_won/is_lost, so the row has to be read
+// back rather than patched optimistically.
+export async function setDealStage(
+  id: string,
+  values: { stage_id: number; board_position: number },
+): Promise<DealBoardRow> {
+  const { data, error } = await supabase.from('deals').update(values).eq('id', id).select(BOARD_SELECT).single()
+
+  if (error) throw error
+  return flattenBoardRow(data)
+}
+
+// handoff_key isn't in the generated Database type yet (database.ts needs
+// regenerating after `alter table crm.deals add column handoff_key uuid`),
+// and postgrest-js's Update type actively rejects excess properties even on
+// a separately-declared object, so a narrow, explicit cast is needed for
+// just this one field rather than widening deals.Update speculatively. It's
+// write-only: nothing reads it back today — it's stored purely for the
+// future real StudioTime API call to use as an idempotency/correlation
+// token.
+export async function markDealHandedOff(id: string): Promise<{ handedOffAt: string }> {
+  const handedOffAt = new Date().toISOString()
+  const payload = { handed_off_at: handedOffAt, handoff_key: crypto.randomUUID() } as Pick<
+    DealRow,
+    'handed_off_at'
+  >
+
+  const { error } = await supabase.from('deals').update(payload).eq('id', id)
+  if (error) throw error
+
+  return { handedOffAt }
+}
