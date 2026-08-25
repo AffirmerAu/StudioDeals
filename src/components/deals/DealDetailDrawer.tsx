@@ -60,7 +60,18 @@ export function DealDetailDrawer({ deal, stages, onClose, onEdit, onDelete }: De
                 </Link>
               }
             />
-            <Row label="Contact" value={deal.contact_name ?? '—'} />
+            <Row
+              label="Contact"
+              value={
+                deal.primary_contact_id && deal.contact_name ? (
+                  <Link to={`/contacts/${deal.primary_contact_id}`} style={{ color: 'var(--color-brand-500)' }}>
+                    {deal.contact_name}
+                  </Link>
+                ) : (
+                  '—'
+                )
+              }
+            />
             <Row label="Deal type" value={DEAL_TYPE_LABEL[deal.deal_type] ?? deal.deal_type} />
             <Row label="Value" value={<span className="tabular">{formatCents(deal.value_cents)}</span>} />
             <Row

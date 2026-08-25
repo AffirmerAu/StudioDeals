@@ -150,3 +150,82 @@ export async function markDealHandedOff(id: string): Promise<{ handedOffAt: stri
 
   return { handedOffAt }
 }
+
+// ---------------------------------------------------------------- deals table
+
+export const DEALS_PAGE_SIZE = 50
+
+export type DealSortColumn = 'title' | 'expected_close_date' | 'value_cents' | 'created_at'
+
+export interface ListDealsParams {
+  search: string
+  stageId: number | null
+  dealType: string
+  /** 'open' | 'won' | 'lost' | '' — resolved to stage ids by the caller. */
+  wonStageIds: number[]
+  lostStageIds: number[]
+  status: string
+  sortColumn: DealSortColumn
+  ascending: boolean
+  page: number
+}
+
+export interface ListDealsResult {
+  rows: DealBoardRow[]
+  total: number
+}
+
+// PostgREST's `or=(...)` treats `,` and `()` as syntax, so strip them from
+// user input before interpolating — same guard as the contacts search.
+function sanitizeForOrFilter(term: string): string {
+  return term.replace(/[,()]/g, ' ').trim()
+}
+
+async function organisationIdsMatching(term: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('organisations')
+    .select('id')
+    .ilike('name', `%${term}%`)
+    .limit(200)
+
+  if (error) throw error
+  return (data ?? []).map((row) => row.id)
+}
+
+export async function listDeals(params: ListDealsParams): Promise<ListDealsResult> {
+  const { search, stageId, dealType, wonStageIds, lostStageIds, status, sortColumn, ascending, page } = params
+  const from = page * DEALS_PAGE_SIZE
+  const to = from + DEALS_PAGE_SIZE - 1
+
+  let query = supabase.from('deals').select(BOARD_SELECT, { count: 'exact' })
+
+  if (stageId !== null) query = query.eq('stage_id', stageId)
+  if (dealType) query = query.eq('deal_type', dealType)
+
+  // Status is a coarser filter than stage and derives from the stage flags,
+  // so it's expressed as a stage-id set rather than a column of its own.
+  if (status === 'won' && wonStageIds.length) query = query.in('stage_id', wonStageIds)
+  if (status === 'lost' && lostStageIds.length) query = query.in('stage_id', lostStageIds)
+  if (status === 'open') {
+    const closed = [...wonStageIds, ...lostStageIds]
+    if (closed.length) query = query.not('stage_id', 'in', `(${closed.join(',')})`)
+  }
+
+  const cleaned = sanitizeForOrFilter(search)
+  if (cleaned) {
+    // The organisation name lives on an embedded resource, and PostgREST
+    // can't or() across the parent and an embed. Resolving matching orgs
+    // first and folding their ids into the same or() keeps it one filter —
+    // the same two-step listContacts uses for tags.
+    const orgIds = await organisationIdsMatching(cleaned)
+    const clauses = [`title.ilike.%${cleaned}%`, `source.ilike.%${cleaned}%`]
+    if (orgIds.length) clauses.push(`organisation_id.in.(${orgIds.join(',')})`)
+    query = query.or(clauses.join(','))
+  }
+
+  query = query.order(sortColumn, { ascending, nullsFirst: false }).range(from, to)
+
+  const { data, error, count } = await query
+  if (error) throw error
+  return { rows: (data ?? []).map(flattenBoardRow), total: count ?? 0 }
+}
