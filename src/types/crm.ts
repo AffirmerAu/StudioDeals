@@ -34,8 +34,11 @@ export type OrganisationSummaryRow = Omit<
 }
 
 type RawContactListRow = Database['crm']['Views']['v_contacts_list']['Row']
-export type ContactListRow = Omit<RawContactListRow, 'id' | 'first_name' | 'is_primary'> & {
+export type ContactListRow = Omit<RawContactListRow, 'id' | 'first_name' | 'is_primary' | 'is_stale'> & {
   id: string
   first_name: string
   is_primary: boolean
+  // (v.id is not null) in the view definition — a boolean expression, never
+  // actually null, unlike every other view column.
+  is_stale: boolean
 }

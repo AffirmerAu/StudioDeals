@@ -52,9 +52,9 @@ export async function listContacts(params: ListContactsParams): Promise<ListCont
 
   const { data, error, count } = await query
   if (error) throw error
-  // id/first_name/is_primary are guaranteed non-null by the base contacts
-  // table even though the generated type marks every view column nullable
-  // — see the comment on ContactListRow in types/crm.ts.
+  // id/first_name/is_primary/is_stale are guaranteed non-null even though
+  // the generated type marks every view column nullable — see the comment
+  // on ContactListRow in types/crm.ts.
   return { rows: (data ?? []) as ContactListRow[], total: count ?? 0 }
 }
 

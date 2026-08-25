@@ -547,6 +547,7 @@ export type Database = {
           id: string | null
           is_client: boolean | null
           is_primary: boolean | null
+          is_stale: boolean | null
           last_contacted_at: string | null
           last_name: string | null
           notes: string | null
