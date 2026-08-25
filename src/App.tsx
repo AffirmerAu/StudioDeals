@@ -1,12 +1,23 @@
+import { lazy } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/AppShell'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { LoginPage } from '@/pages/LoginPage'
-import { DashboardPage } from '@/pages/DashboardPage'
-import { PipelinePage } from '@/pages/PipelinePage'
-import { ContactsPage } from '@/pages/ContactsPage'
-import { OrganisationsPage } from '@/pages/OrganisationsPage'
-import { OrganisationDetailPage } from '@/pages/OrganisationDetailPage'
+
+// Each page is its own chunk, which also strands its heavy dependencies with
+// it: recharts only ships with the dashboard, @dnd-kit only with the pipeline.
+// LoginPage stays eager — it's small and it's the first paint for anyone
+// signed out, so a second round trip there is the one place it would hurt.
+// AppShell holds the Suspense boundary.
+const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
+const PipelinePage = lazy(() => import('@/pages/PipelinePage').then((m) => ({ default: m.PipelinePage })))
+const ContactsPage = lazy(() => import('@/pages/ContactsPage').then((m) => ({ default: m.ContactsPage })))
+const OrganisationsPage = lazy(() =>
+  import('@/pages/OrganisationsPage').then((m) => ({ default: m.OrganisationsPage })),
+)
+const OrganisationDetailPage = lazy(() =>
+  import('@/pages/OrganisationDetailPage').then((m) => ({ default: m.OrganisationDetailPage })),
+)
 
 export default function App() {
   return (

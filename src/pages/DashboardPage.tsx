@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { Suspense, lazy, useEffect, useState } from 'react'
 import { usePipelineStages } from '@/lib/pipeline-stages'
 import { useToast } from '@/lib/toast-context'
 import {
@@ -17,10 +17,18 @@ import { StatTile } from '@/components/StatTile'
 import { SkeletonBlock } from '@/components/Skeleton'
 import { EmptyState } from '@/components/EmptyState'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { StageValueChart } from '@/components/deals/StageValueChart'
-import { ForecastChart } from '@/components/deals/ForecastChart'
 import { NeedsAttentionList } from '@/components/deals/NeedsAttentionList'
 import type { DealsNeedingAttentionRow, PendingHandoffRow, PipelineForecastRow } from '@/types/crm'
+
+// Recharts is the single largest dependency in the app and only these two
+// components touch it. Loading them lazily keeps it off the landing route's
+// critical path — the tiles and lists paint while the charts stream in.
+const StageValueChart = lazy(() =>
+  import('@/components/deals/StageValueChart').then((m) => ({ default: m.StageValueChart })),
+)
+const ForecastChart = lazy(() =>
+  import('@/components/deals/ForecastChart').then((m) => ({ default: m.ForecastChart })),
+)
 
 function startOfMonthISO(): string {
   const now = new Date()
@@ -142,8 +150,12 @@ export function DashboardPage() {
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <StageValueChart stages={stages} totals={stageValues} />
-        <ForecastChart rows={forecast} />
+        <Suspense fallback={<SkeletonBlock className="h-72" />}>
+          <StageValueChart stages={stages} totals={stageValues} />
+        </Suspense>
+        <Suspense fallback={<SkeletonBlock className="h-72" />}>
+          <ForecastChart rows={forecast} />
+        </Suspense>
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">

@@ -151,7 +151,7 @@ export function OrganisationsPage() {
                 >
                   <td className="px-4 py-3 font-medium">
                     <div className="flex items-center gap-2">
-                      <CompanyLogo name={org.name} website={org.website} size={20} />
+                      <CompanyLogo name={org.name} website={org.website} size={40} />
                       {org.name}
                     </div>
                   </td>
