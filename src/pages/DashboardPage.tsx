@@ -10,6 +10,8 @@ import {
   type StageValueTotal,
 } from '@/lib/dashboard'
 import { markDealHandedOff } from '@/lib/deals'
+import { listOpenFollowUps, setActivityCompleted, type OpenFollowUpRow } from '@/lib/activities'
+import { FollowUpsList } from '@/components/FollowUpsList'
 import { formatCents, formatDate } from '@/lib/format'
 import { StatTile } from '@/components/StatTile'
 import { SkeletonBlock } from '@/components/Skeleton'
@@ -35,6 +37,8 @@ export function DashboardPage() {
   const [needsAttention, setNeedsAttention] = useState<DealsNeedingAttentionRow[]>([])
   const [pendingHandoff, setPendingHandoff] = useState<PendingHandoffRow[]>([])
   const [wonThisMonth, setWonThisMonth] = useState({ count: 0, valueCents: 0 })
+  const [openFollowUps, setOpenFollowUps] = useState<OpenFollowUpRow[]>([])
+  const [followUpBusyId, setFollowUpBusyId] = useState<string | null>(null)
   const [handoffDeal, setHandoffDeal] = useState<PendingHandoffRow | null>(null)
   const [handoffBusy, setHandoffBusy] = useState(false)
 
@@ -50,14 +54,16 @@ export function DashboardPage() {
       fetchDealsNeedingAttention(),
       fetchPendingHandoff(),
       fetchWonValueSince(wonStageIds, startOfMonthISO()),
+      listOpenFollowUps(),
     ])
-      .then(([values, forecastRows, attention, handoff, won]) => {
+      .then(([values, forecastRows, attention, handoff, won, followUps]) => {
         if (cancelled) return
         setStageValues(values)
         setForecast(forecastRows)
         setNeedsAttention(attention)
         setPendingHandoff(handoff)
         setWonThisMonth(won)
+        setOpenFollowUps(followUps)
       })
       .catch((error: unknown) => {
         if (!cancelled) showToast(error instanceof Error ? error.message : 'Failed to load dashboard', 'error')
@@ -70,6 +76,21 @@ export function DashboardPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stagesLoading])
+
+  // Drop it from the list straight away, restore it if the write fails.
+  const handleCompleteFollowUp = async (row: OpenFollowUpRow) => {
+    const previous = openFollowUps
+    setFollowUpBusyId(row.id)
+    setOpenFollowUps((current) => current.filter((r) => r.id !== row.id))
+    try {
+      await setActivityCompleted(row.id, true)
+    } catch (error) {
+      setOpenFollowUps(previous)
+      showToast(error instanceof Error ? error.message : 'Failed to update follow-up', 'error')
+    } finally {
+      setFollowUpBusyId(null)
+    }
+  }
 
   const handleConfirmHandoff = async () => {
     if (!handoffDeal) return
@@ -126,6 +147,13 @@ export function DashboardPage() {
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', background: 'var(--surface-raised)' }}>
+          <h3 className="text-sm font-semibold tracking-tight">Follow-ups due</h3>
+          <div className="mt-3">
+            <FollowUpsList rows={openFollowUps} busyId={followUpBusyId} onComplete={handleCompleteFollowUp} />
+          </div>
+        </div>
+
         <NeedsAttentionList rows={needsAttention} />
 
         <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', background: 'var(--surface-raised)' }}>
