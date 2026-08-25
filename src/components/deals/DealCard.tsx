@@ -6,6 +6,8 @@ import type { DealBoardRow } from '@/lib/deals'
 
 interface DealCardContentProps {
   deal: DealBoardRow
+  /** The card's stage colour, so a card is placeable without reading a label. */
+  stageColor?: string
   onClick?: () => void
   /** Omitted by DragOverlay, which renders a plain visual copy with no actions. */
   menu?: DealCardMenuProps
@@ -14,12 +16,21 @@ interface DealCardContentProps {
 /** Pure presentational card — used directly by DragOverlay, which needs a
  * plain visual copy rather than a second `useSortable` registration for the
  * same id. */
-export function DealCardContent({ deal, onClick, menu }: DealCardContentProps) {
+export function DealCardContent({ deal, stageColor, onClick, menu }: DealCardContentProps) {
   return (
     <div
       onClick={onClick}
       className="cursor-pointer rounded-lg border p-3 text-sm transition-colors duration-150"
-      style={{ borderColor: 'var(--border)', background: 'var(--surface-raised)' }}
+      style={{
+        borderColor: 'var(--border)',
+        // The wash sits under the card's own surface so the text keeps its
+        // contrast; the accent rides in a box-shadow rather than the border,
+        // which the hover handler below rewrites wholesale.
+        background: stageColor
+          ? `color-mix(in srgb, ${stageColor} 7%, var(--surface-raised))`
+          : 'var(--surface-raised)',
+        boxShadow: stageColor ? `inset 3px 0 0 ${stageColor}` : undefined,
+      }}
       onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--color-brand-500)')}
       onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--border)')}
     >
@@ -50,11 +61,12 @@ export function DealCardContent({ deal, onClick, menu }: DealCardContentProps) {
 
 interface DealCardProps {
   deal: DealBoardRow
+  stageColor: string
   onClick: () => void
   menu: DealCardMenuProps
 }
 
-export function DealCard({ deal, onClick, menu }: DealCardProps) {
+export function DealCard({ deal, stageColor, onClick, menu }: DealCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useSortable({ id: deal.id })
 
   const style = {
@@ -64,7 +76,7 @@ export function DealCard({ deal, onClick, menu }: DealCardProps) {
 
   return (
     <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <DealCardContent deal={deal} onClick={onClick} menu={menu} />
+      <DealCardContent deal={deal} stageColor={stageColor} onClick={onClick} menu={menu} />
     </div>
   )
 }

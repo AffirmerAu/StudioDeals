@@ -1,15 +1,13 @@
 import { useDroppable } from '@dnd-kit/core'
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { formatCents } from '@/lib/format'
-import { StageBadge } from '@/components/StageBadge'
+import { StageBadge, stageColor } from '@/components/StageBadge'
 import { DealCard } from '@/components/deals/DealCard'
 import type { DealBoardRow } from '@/lib/deals'
 import type { PipelineStageRow } from '@/types/crm'
 
 interface PipelineColumnProps {
   stage: PipelineStageRow
-  /** Coarse phase colour from stagePhaseColor(), washed behind the header. */
-  phaseColor: string
   deals: DealBoardRow[]
   onCardClick: (deal: DealBoardRow) => void
   onAddClick: (stageId: number) => void
@@ -20,7 +18,6 @@ interface PipelineColumnProps {
 
 export function PipelineColumn({
   stage,
-  phaseColor,
   deals,
   onCardClick,
   onAddClick,
@@ -30,6 +27,7 @@ export function PipelineColumn({
 }: PipelineColumnProps) {
   const { setNodeRef } = useDroppable({ id: stage.id })
   const totalCents = deals.reduce((sum, deal) => sum + deal.value_cents, 0)
+  const color = stageColor(stage.key)
 
   return (
     <div className="flex w-72 shrink-0 flex-col">
@@ -37,9 +35,9 @@ export function PipelineColumn({
         className="mb-2 flex items-center justify-between rounded-lg border px-2 py-1.5"
         style={{
           // A wash, not a fill — the header has to stay quieter than the cards
-          // below it while still reading as its phase at a glance.
-          background: `color-mix(in srgb, ${phaseColor} 10%, transparent)`,
-          borderColor: `color-mix(in srgb, ${phaseColor} 28%, transparent)`,
+          // below it while still reading as its stage at a glance.
+          background: `color-mix(in srgb, ${color} 10%, transparent)`,
+          borderColor: `color-mix(in srgb, ${color} 28%, transparent)`,
         }}
       >
         <StageBadge stageKey={stage.key} label={stage.label} />
@@ -58,6 +56,7 @@ export function PipelineColumn({
             <DealCard
               key={deal.id}
               deal={deal}
+              stageColor={color}
               onClick={() => onCardClick(deal)}
               menu={{
                 onEdit: () => onCardClick(deal),
