@@ -28,7 +28,7 @@ export function DealCardContent({ deal, onClick, menu }: DealCardContentProps) {
         {menu && <DealCardMenu {...menu} />}
       </div>
       <div className="mt-1.5 flex items-center gap-1.5">
-        <CompanyLogo name={deal.organisation_name} website={deal.organisation_website} size={20} />
+        <CompanyLogo name={deal.organisation_name} website={deal.organisation_website} size={30} />
         <p className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
           {deal.organisation_name}
         </p>
