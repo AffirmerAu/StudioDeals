@@ -41,6 +41,19 @@ interface FormState {
   expected_close_date: string
   source: string
   notes: string
+  /** Whole percent, or '' to fall back to the stage's own probability. */
+  probabilityPercent: string
+  lostReason: string
+}
+
+/** Whole percent in, 0–1 out. Anything outside 0–100 is treated as no
+ * override rather than clamped, so a typo doesn't silently skew the forecast. */
+function percentToProbability(input: string): number | null {
+  const trimmed = input.trim()
+  if (!trimmed) return null
+  const n = Number.parseInt(trimmed, 10)
+  if (!Number.isFinite(n) || n < 0 || n > 100) return null
+  return n / 100
 }
 
 function toFormState(deal: DealBoardRow | null, defaultStageId: number): FormState {
@@ -53,6 +66,8 @@ function toFormState(deal: DealBoardRow | null, defaultStageId: number): FormSta
       expected_close_date: '',
       source: '',
       notes: '',
+      probabilityPercent: '',
+      lostReason: '',
     }
   }
   return {
@@ -63,6 +78,11 @@ function toFormState(deal: DealBoardRow | null, defaultStageId: number): FormSta
     expected_close_date: deal.expected_close_date ?? '',
     source: deal.source ?? '',
     notes: deal.notes ?? '',
+    // Stored 0–1, shown as whole percent: people think in percentages, and
+    // numeric(3,2) can't hold more precision than that anyway.
+    probabilityPercent:
+      deal.probability_override === null ? '' : String(Math.round(deal.probability_override * 100)),
+    lostReason: deal.lost_reason ?? '',
   }
 }
 
@@ -81,6 +101,10 @@ export function DealFormModal({
   const [organisation, setOrganisation] = useState<OrganisationOption | null>(null)
   const [contact, setContact] = useState<ContactOption | null>(null)
   const [saving, setSaving] = useState(false)
+
+  const selectedStage = stages.find((s) => s.id === values.stage_id)
+  const isLostStage = selectedStage?.is_lost ?? false
+  const stageDefaultPercent = selectedStage ? Math.round(selectedStage.probability * 100) : null
 
   useEffect(() => {
     if (!open) return
@@ -107,6 +131,10 @@ export function DealFormModal({
       expected_close_date: values.expected_close_date || null,
       source: values.source.trim() || null,
       notes: values.notes.trim() || null,
+      probability_override: percentToProbability(values.probabilityPercent),
+      // Only meaningful on a lost deal; moving off Lost clears it rather than
+      // leaving a stale reason attached to a live deal.
+      lost_reason: isLostStage ? values.lostReason.trim() || null : null,
     }
 
     if (deal) {
@@ -240,6 +268,35 @@ export function DealFormModal({
           />
         </Field>
 
+        <Field label="Probability">
+          <input
+            type="number"
+            min={0}
+            max={100}
+            step={1}
+            value={values.probabilityPercent}
+            onChange={(e) => setValues((v) => ({ ...v, probabilityPercent: e.target.value }))}
+            placeholder={stageDefaultPercent === null ? 'Stage default' : `${stageDefaultPercent}% (stage default)`}
+            className={inputClass}
+            style={inputStyle}
+          />
+          <p className="text-xs" style={{ color: 'var(--text-subtle)' }}>
+            Overrides the stage's own probability in the weighted forecast. Leave blank to use the stage default.
+          </p>
+        </Field>
+
+        {isLostStage && (
+          <Field label="Lost reason">
+            <input
+              value={values.lostReason}
+              onChange={(e) => setValues((v) => ({ ...v, lostReason: e.target.value }))}
+              placeholder="Why was it lost?"
+              className={inputClass}
+              style={inputStyle}
+            />
+          </Field>
+        )}
+
         <Field label="Notes">
           <textarea
             value={values.notes}
@@ -276,14 +333,16 @@ export function DealFormModal({
 const inputClass = 'w-full rounded-lg border px-3 py-2 text-sm outline-none transition-colors duration-150'
 const inputStyle = { borderColor: 'var(--border)', background: 'var(--surface)', color: 'var(--text)' }
 
+/** The label is tied to its control by wrapping it, so screen readers (and
+ * getByLabel) resolve the pair without every call site inventing an id. */
 function Field({ label, required, children }: { label: string; required?: boolean; children: ReactNode }) {
   return (
-    <div className="space-y-1.5">
-      <label className="block text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+    <label className="block space-y-1.5">
+      <span className="block text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
         {label}
         {required && ' *'}
-      </label>
+      </span>
       {children}
-    </div>
+    </label>
   )
 }

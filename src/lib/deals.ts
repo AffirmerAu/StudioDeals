@@ -89,6 +89,8 @@ export type DealFormValues = Pick<
   | 'expected_close_date'
   | 'source'
   | 'notes'
+  | 'probability_override'
+  | 'lost_reason'
 >
 
 export async function createDeal(values: DealFormValues, boardPosition: number): Promise<DealBoardRow> {
@@ -122,9 +124,23 @@ export async function deleteDeal(id: string): Promise<void> {
 // back rather than patched optimistically.
 export async function setDealStage(
   id: string,
-  values: { stage_id: number; board_position: number },
+  values: { stage_id: number; board_position: number; lost_reason?: string | null },
 ): Promise<DealBoardRow> {
   const { data, error } = await supabase.from('deals').update(values).eq('id', id).select(BOARD_SELECT).single()
+
+  if (error) throw error
+  return flattenBoardRow(data)
+}
+
+/** Records why a deal was lost without touching its stage — used when the
+ * move already happened (a drag) and only the reason is outstanding. */
+export async function setDealLostReason(id: string, reason: string | null): Promise<DealBoardRow> {
+  const { data, error } = await supabase
+    .from('deals')
+    .update({ lost_reason: reason })
+    .eq('id', id)
+    .select(BOARD_SELECT)
+    .single()
 
   if (error) throw error
   return flattenBoardRow(data)
