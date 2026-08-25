@@ -6,15 +6,25 @@ import { createContact, updateContact, type ContactFormValues } from '@/lib/cont
 import { searchOrganisations, type OrganisationOption } from '@/lib/organisations'
 import type { ContactRow } from '@/types/crm'
 
+// Only the fields this form actually reads/writes — a Pick rather than the
+// full ContactRow so callers can pass either a table row (ContactRow) or a
+// view row (ContactListRow, e.g. from ContactDetailDrawer); both carry every
+// field below with a matching type, but the view row is missing
+// legacy_capsule_id/updated_at, which this form never touches anyway.
+export type ContactEditableFields = Pick<
+  ContactRow,
+  'id' | 'first_name' | 'last_name' | 'role' | 'email' | 'phone' | 'organisation_id' | 'is_primary' | 'notes'
+>
+
 interface ContactFormModalProps {
   open: boolean
-  contact: ContactRow | null
+  contact: ContactEditableFields | null
   initialOrganisation?: OrganisationOption | null
   onClose: () => void
   /** Called with the saved row once persisted (edits fire this optimistically, before the request resolves). */
-  onSaved: (saved: ContactRow) => void
+  onSaved: (saved: ContactEditableFields) => void
   /** Called only for edits, if the background save fails — use it to roll the optimistic update back. */
-  onSaveFailed?: (previous: ContactRow) => void
+  onSaveFailed?: (previous: ContactEditableFields) => void
 }
 
 type FormState = Omit<ContactFormValues, 'organisation_id'>
@@ -29,7 +39,7 @@ const EMPTY_VALUES: FormState = {
   notes: '',
 }
 
-function toFormValues(contact: ContactRow | null): FormState {
+function toFormValues(contact: ContactEditableFields | null): FormState {
   if (!contact) return EMPTY_VALUES
   return {
     first_name: contact.first_name,

@@ -40,7 +40,11 @@ export async function listOrganisations(params: ListOrganisationsParams): Promis
   const { data, error, count } = await query
   if (error) throw error
 
-  return { rows: data ?? [], total: count ?? 0 }
+  // id/name/contact_count/open_deal_count/won_value_cents are guaranteed
+  // non-null by the view's own definition (org PK, COALESCE'd aggregates)
+  // even though the generated type marks every view column nullable — see
+  // the comment on OrganisationSummaryRow in types/crm.ts.
+  return { rows: (data ?? []) as OrganisationSummaryRow[], total: count ?? 0 }
 }
 
 export async function listIndustries(): Promise<string[]> {

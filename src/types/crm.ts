@@ -12,5 +12,30 @@ export type ActivityRow = Database['crm']['Tables']['activities']['Row']
 export type PipelineStageRow = Database['crm']['Tables']['pipeline_stages']['Row']
 export type TagRow = Database['crm']['Tables']['tags']['Row']
 
-export type OrganisationSummaryRow = Database['crm']['Views']['v_organisation_summary']['Row']
-export type ContactListRow = Database['crm']['Views']['v_contacts_list']['Row']
+// `supabase gen types` marks every view column nullable regardless of the
+// underlying table's constraints — Postgres view introspection doesn't
+// propagate NOT NULL the way it does for base tables, and there's no SQL
+// fix for it. These narrow only the columns we can actually prove are
+// non-null from the view's own definition (primary keys, and aggregates
+// that are always coalesced/counted) — never columns that are genuinely
+// optional (organisation_name, last_contacted_at, etc.). The narrowing is
+// applied once, at the query boundary in lib/organisations.ts and
+// lib/contacts.ts, rather than scattered as assertions through components.
+type RawOrganisationSummaryRow = Database['crm']['Views']['v_organisation_summary']['Row']
+export type OrganisationSummaryRow = Omit<
+  RawOrganisationSummaryRow,
+  'id' | 'name' | 'contact_count' | 'open_deal_count' | 'won_value_cents'
+> & {
+  id: string
+  name: string
+  contact_count: number
+  open_deal_count: number
+  won_value_cents: number
+}
+
+type RawContactListRow = Database['crm']['Views']['v_contacts_list']['Row']
+export type ContactListRow = Omit<RawContactListRow, 'id' | 'first_name' | 'is_primary'> & {
+  id: string
+  first_name: string
+  is_primary: boolean
+}

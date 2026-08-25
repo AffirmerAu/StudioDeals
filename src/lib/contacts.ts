@@ -52,7 +52,10 @@ export async function listContacts(params: ListContactsParams): Promise<ListCont
 
   const { data, error, count } = await query
   if (error) throw error
-  return { rows: data ?? [], total: count ?? 0 }
+  // id/first_name/is_primary are guaranteed non-null by the base contacts
+  // table even though the generated type marks every view column nullable
+  // — see the comment on ContactListRow in types/crm.ts.
+  return { rows: (data ?? []) as ContactListRow[], total: count ?? 0 }
 }
 
 export async function listContactsForOrganisation(organisationId: string): Promise<ContactRow[]> {
@@ -69,7 +72,9 @@ export async function listContactsForOrganisation(organisationId: string): Promi
 export async function getContact(id: string): Promise<ContactListRow | null> {
   const { data, error } = await supabase.from('v_contacts_list').select('*').eq('id', id).maybeSingle()
   if (error) throw error
-  return data
+  // Same narrowing as listContacts above — a matched row always has a real
+  // id/first_name/is_primary.
+  return data as ContactListRow | null
 }
 
 export type ContactFormValues = Pick<
