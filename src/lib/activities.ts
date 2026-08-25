@@ -26,8 +26,27 @@ export function countsAsContact(type: string): boolean {
   return CONTACT_TYPES.has(type)
 }
 
+/** The contact is embedded so the timeline can name who an activity was with
+ * — needed on an organisation's timeline, where rows span several people, and
+ * to prefill the picker when editing. */
+export type TimelineActivityRow = ActivityRow & { contact_name: string | null }
+
+const TIMELINE_SELECT = '*, contacts(first_name, last_name)'
+
+type RawTimelineRow = ActivityRow & {
+  contacts: { first_name: string; last_name: string | null } | null
+}
+
+function flattenTimelineRow(row: RawTimelineRow): TimelineActivityRow {
+  const { contacts, ...activity } = row
+  return {
+    ...activity,
+    contact_name: contacts ? [contacts.first_name, contacts.last_name].filter(Boolean).join(' ') : null,
+  }
+}
+
 export interface ActivityPage {
-  rows: ActivityRow[]
+  rows: TimelineActivityRow[]
   hasMore: boolean
 }
 
@@ -46,7 +65,7 @@ export async function listActivities({
 }: ListActivitiesParams): Promise<ActivityPage> {
   let query = supabase
     .from('activities')
-    .select('*')
+    .select(TIMELINE_SELECT)
     .order('occurred_at', { ascending: false })
     .range(offset, offset + ACTIVITIES_PAGE_SIZE)
 
@@ -57,7 +76,7 @@ export async function listActivities({
   const { data, error } = await query
   if (error) throw error
 
-  const rows = data ?? []
+  const rows = (data ?? []).map(flattenTimelineRow)
   const hasMore = rows.length > ACTIVITIES_PAGE_SIZE
   return { rows: hasMore ? rows.slice(0, ACTIVITIES_PAGE_SIZE) : rows, hasMore }
 }
@@ -67,28 +86,50 @@ export type ActivityFormValues = Pick<
   'type' | 'subject' | 'notes' | 'occurred_at' | 'due_at' | 'deal_id' | 'contact_id' | 'organisation_id'
 >
 
-export async function createActivity(values: ActivityFormValues, createdBy: string | null): Promise<ActivityRow> {
+export async function createActivity(
+  values: ActivityFormValues,
+  createdBy: string | null,
+): Promise<TimelineActivityRow> {
   const { data, error } = await supabase
     .from('activities')
     .insert({ ...values, created_by: createdBy })
-    .select('*')
+    .select(TIMELINE_SELECT)
     .single()
 
   if (error) throw error
-  return data
+  return flattenTimelineRow(data)
+}
+
+/** created_by is deliberately left alone — it records who logged the activity,
+ * not who last corrected it. */
+export async function updateActivity(id: string, values: ActivityFormValues): Promise<TimelineActivityRow> {
+  const { data, error } = await supabase
+    .from('activities')
+    .update(values)
+    .eq('id', id)
+    .select(TIMELINE_SELECT)
+    .single()
+
+  if (error) throw error
+  return flattenTimelineRow(data)
+}
+
+export async function deleteActivity(id: string): Promise<void> {
+  const { error } = await supabase.from('activities').delete().eq('id', id)
+  if (error) throw error
 }
 
 /** Ticking a follow-up off is just stamping completed_at; clearing it reopens. */
-export async function setActivityCompleted(id: string, completed: boolean): Promise<ActivityRow> {
+export async function setActivityCompleted(id: string, completed: boolean): Promise<TimelineActivityRow> {
   const { data, error } = await supabase
     .from('activities')
     .update({ completed_at: completed ? new Date().toISOString() : null })
     .eq('id', id)
-    .select('*')
+    .select(TIMELINE_SELECT)
     .single()
 
   if (error) throw error
-  return data
+  return flattenTimelineRow(data)
 }
 
 export type OpenFollowUpRow = ActivityRow & {

@@ -8,10 +8,11 @@ import {
   ACTIVITY_TYPE_LABEL,
   countsAsContact,
   createActivity,
+  updateActivity,
   type ActivityFormValues,
+  type TimelineActivityRow,
 } from '@/lib/activities'
 import { searchContactsForOrganisation, type ContactOption } from '@/lib/contacts'
-import type { ActivityRow } from '@/types/crm'
 
 /** Where the activity is being logged from — fills the FKs the timeline's own
  * filter can't supply (a deal knows its organisation and primary contact). */
@@ -25,8 +26,10 @@ export interface ActivityDefaults {
 interface ActivityFormModalProps {
   open: boolean
   defaults: ActivityDefaults
+  /** Set to edit an existing activity instead of logging a new one. */
+  activity?: TimelineActivityRow | null
   onClose: () => void
-  onSaved: (activity: ActivityRow) => void
+  onSaved: (activity: TimelineActivityRow) => void
 }
 
 /** `datetime-local` speaks local wall-clock with no zone; the column is
@@ -44,7 +47,8 @@ function fromLocalInput(value: string): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString()
 }
 
-export function ActivityFormModal({ open, defaults, onClose, onSaved }: ActivityFormModalProps) {
+export function ActivityFormModal({ open, defaults, activity, onClose, onSaved }: ActivityFormModalProps) {
+  const editing = Boolean(activity)
   const { session } = useAuth()
   const { showToast } = useToast()
 
@@ -56,9 +60,23 @@ export function ActivityFormModal({ open, defaults, onClose, onSaved }: Activity
   const [contact, setContact] = useState<ContactOption | null>(null)
   const [saving, setSaving] = useState(false)
 
-  // Reopening the modal is a fresh log, not a continuation of the last one.
+  // Reopening is either a fresh log or a fresh edit — never a continuation of
+  // whatever was in the form last time.
   useEffect(() => {
     if (!open) return
+    if (activity) {
+      setType(activity.type)
+      setSubject(activity.subject ?? '')
+      setNotes(activity.notes ?? '')
+      setOccurredAt(toLocalInput(activity.occurred_at))
+      setDueAt(activity.due_at ? toLocalInput(activity.due_at) : '')
+      setContact(
+        activity.contact_id && activity.contact_name
+          ? { id: activity.contact_id, first_name: activity.contact_name, last_name: null }
+          : null,
+      )
+      return
+    }
     setType('call')
     setSubject('')
     setNotes('')
@@ -70,11 +88,14 @@ export function ActivityFormModal({ open, defaults, onClose, onSaved }: Activity
         : null,
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  }, [open, activity?.id])
 
-  // The contact picker is only meaningful when we know which organisation to
-  // search within; the contact drawer already pins one, so it's hidden there.
-  const showContactPicker = !defaults.contactId && Boolean(defaults.organisationId)
+  // The picker needs an organisation to search within. When editing, the
+  // activity's own organisation stands in for the surface's default.
+  const pickerOrganisationId = (editing ? activity?.organisation_id : null) ?? defaults.organisationId ?? null
+  // A contact pinned by the surface itself (the contact drawer) isn't
+  // changeable; an inferred or existing one is.
+  const showContactPicker = Boolean(pickerOrganisationId) && !(!editing && defaults.contactId)
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
@@ -86,18 +107,23 @@ export function ActivityFormModal({ open, defaults, onClose, onSaved }: Activity
       notes: notes.trim() || null,
       occurred_at: fromLocalInput(occurredAt) ?? new Date().toISOString(),
       due_at: fromLocalInput(dueAt),
-      deal_id: defaults.dealId ?? null,
-      organisation_id: defaults.organisationId ?? null,
-      contact_id: contact?.id ?? defaults.contactId ?? null,
+      // An edit keeps whatever it was already attached to; only the contact
+      // is changeable, since that's the one that gets mis-picked.
+      deal_id: (editing ? activity?.deal_id : defaults.dealId) ?? null,
+      organisation_id: (editing ? activity?.organisation_id : defaults.organisationId) ?? null,
+      contact_id: contact?.id ?? (editing ? null : defaults.contactId) ?? null,
     }
 
     try {
-      const saved = await createActivity(values, session?.user.id ?? null)
+      const saved = activity
+        ? await updateActivity(activity.id, values)
+        : await createActivity(values, session?.user.id ?? null)
       onSaved(saved)
-      showToast(`${ACTIVITY_TYPE_LABEL[type] ?? 'Activity'} logged`)
+      showToast(editing ? 'Activity updated' : `${ACTIVITY_TYPE_LABEL[type] ?? 'Activity'} logged`)
       onClose()
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to log activity', 'error')
+      const verb = editing ? 'update' : 'log'
+      showToast(error instanceof Error ? error.message : `Failed to ${verb} activity`, 'error')
     } finally {
       setSaving(false)
     }
@@ -105,10 +131,10 @@ export function ActivityFormModal({ open, defaults, onClose, onSaved }: Activity
 
   // Warn rather than block: logging is still valid, it just won't refresh the
   // contact's last-contacted date, which is easy to expect and not get.
-  const contactless = countsAsContact(type) && !contact && !defaults.contactId
+  const contactless = countsAsContact(type) && !contact && !(editing ? false : defaults.contactId)
 
   return (
-    <Modal open={open} onClose={onClose} title="Log activity">
+    <Modal open={open} onClose={onClose} title={editing ? 'Edit activity' : 'Log activity'}>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <Field label="Type" htmlFor="activity-type" required>
@@ -138,7 +164,7 @@ export function ActivityFormModal({ open, defaults, onClose, onSaved }: Activity
             <Combobox<ContactOption>
               value={contact}
               onChange={setContact}
-              search={(q) => searchContactsForOrganisation(defaults.organisationId as string, q)}
+              search={(q) => searchContactsForOrganisation(pickerOrganisationId as string, q)}
               getLabel={(c) => [c.first_name, c.last_name].filter(Boolean).join(' ')}
               getKey={(c) => c.id}
               id="activity-contact"
@@ -201,7 +227,7 @@ export function ActivityFormModal({ open, defaults, onClose, onSaved }: Activity
             className="rounded-lg px-3 py-1.5 text-sm font-medium text-white transition-colors duration-150 disabled:opacity-60"
             style={{ background: 'var(--color-brand-500)' }}
           >
-            {saving ? 'Saving…' : 'Log'}
+            {saving ? 'Saving…' : editing ? 'Save' : 'Log'}
           </button>
         </div>
       </form>
