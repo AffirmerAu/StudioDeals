@@ -109,6 +109,13 @@ export async function updateDeal(id: string, values: DealFormValues): Promise<De
   return flattenBoardRow(data)
 }
 
+// activities.deal_id is ON DELETE CASCADE, so a deal's logged activities go
+// with it. That's why the caller confirms first.
+export async function deleteDeal(id: string): Promise<void> {
+  const { error } = await supabase.from('deals').delete().eq('id', id)
+  if (error) throw error
+}
+
 // Moving a deal into a won/lost stage is a plain stage_id write — the
 // `trg_deals_close_stamps` trigger in 001_initial_schema.sql sets (and clears)
 // won_at/lost_at from the stage's is_won/is_lost, so the row has to be read
