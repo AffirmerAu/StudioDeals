@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react'
-import { ACTIVITY_TYPE_LABEL, listActivities, setActivityCompleted } from '@/lib/activities'
+import {
+  ACTIVITY_TYPE_LABEL,
+  deleteActivity,
+  listActivities,
+  setActivityCompleted,
+  type TimelineActivityRow,
+} from '@/lib/activities'
 import { formatDateTime } from '@/lib/format'
 import { useToast } from '@/lib/toast-context'
 import { EmptyState } from '@/components/EmptyState'
 import { SkeletonBlock } from '@/components/Skeleton'
 import { ActivityFormModal, type ActivityDefaults } from '@/components/ActivityFormModal'
-import type { ActivityRow } from '@/types/crm'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 interface ActivityTimelineProps {
   organisationId?: string
@@ -17,11 +23,14 @@ interface ActivityTimelineProps {
 
 export function ActivityTimeline({ organisationId, contactId, dealId, logDefaults }: ActivityTimelineProps) {
   const { showToast } = useToast()
-  const [rows, setRows] = useState<ActivityRow[]>([])
+  const [rows, setRows] = useState<TimelineActivityRow[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
   const [logOpen, setLogOpen] = useState(false)
+  const [editing, setEditing] = useState<TimelineActivityRow | null>(null)
+  const [deleting, setDeleting] = useState<TimelineActivityRow | null>(null)
+  const [deleteBusy, setDeleteBusy] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -53,7 +62,7 @@ export function ActivityTimeline({ organisationId, contactId, dealId, logDefault
 
   // Optimistic: a controlled checkbox that waits for the round-trip before it
   // ticks reads as a dead click. Roll back if the write fails.
-  const toggleCompleted = async (activity: ActivityRow) => {
+  const toggleCompleted = async (activity: TimelineActivityRow) => {
     const completing = activity.completed_at === null
     setBusyId(activity.id)
     setRows((current) =>
@@ -67,6 +76,21 @@ export function ActivityTimeline({ organisationId, contactId, dealId, logDefault
       showToast(error instanceof Error ? error.message : 'Failed to update follow-up', 'error')
     } finally {
       setBusyId(null)
+    }
+  }
+
+  const handleDelete = async () => {
+    if (!deleting) return
+    setDeleteBusy(true)
+    try {
+      await deleteActivity(deleting.id)
+      setRows((current) => current.filter((r) => r.id !== deleting.id))
+      showToast('Activity deleted')
+      setDeleting(null)
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Failed to delete activity', 'error')
+    } finally {
+      setDeleteBusy(false)
     }
   }
 
@@ -85,10 +109,20 @@ export function ActivityTimeline({ organisationId, contactId, dealId, logDefault
 
   const modal = logDefaults && (
     <ActivityFormModal
-      open={logOpen}
+      open={logOpen || editing !== null}
       defaults={logDefaults}
-      onClose={() => setLogOpen(false)}
-      onSaved={(saved) => setRows((current) => [saved, ...current])}
+      activity={editing}
+      onClose={() => {
+        setLogOpen(false)
+        setEditing(null)
+      }}
+      onSaved={(saved) =>
+        setRows((current) =>
+          current.some((r) => r.id === saved.id)
+            ? current.map((r) => (r.id === saved.id ? saved : r))
+            : [saved, ...current],
+        )
+      }
     />
   )
 
@@ -116,6 +150,8 @@ export function ActivityTimeline({ organisationId, contactId, dealId, logDefault
               activity={activity}
               busy={busyId === activity.id}
               onToggleCompleted={() => void toggleCompleted(activity)}
+              onEdit={() => setEditing(activity)}
+              onDelete={() => setDeleting(activity)}
             />
           ))}
         </ul>
@@ -134,7 +170,35 @@ export function ActivityTimeline({ organisationId, contactId, dealId, logDefault
       )}
 
       {modal}
+
+      <ConfirmDialog
+        open={deleting !== null}
+        title="Delete activity"
+        message={
+          deleting
+            ? `Delete "${deleting.subject || ACTIVITY_TYPE_LABEL[deleting.type]}"? This can't be undone.`
+            : ''
+        }
+        confirmLabel="Delete"
+        danger
+        busy={deleteBusy}
+        onConfirm={handleDelete}
+        onClose={() => setDeleting(null)}
+      />
     </div>
+  )
+}
+
+function RowAction({ label, onClick, color }: { label: string; onClick: () => void; color?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-lg px-1 text-xs font-medium transition-colors duration-150"
+      style={{ color: color ?? 'var(--text-subtle)' }}
+    >
+      {label}
+    </button>
   )
 }
 
@@ -142,10 +206,14 @@ function ActivityItem({
   activity,
   busy,
   onToggleCompleted,
+  onEdit,
+  onDelete,
 }: {
-  activity: ActivityRow
+  activity: TimelineActivityRow
   busy: boolean
   onToggleCompleted: () => void
+  onEdit: () => void
+  onDelete: () => void
 }) {
   const done = activity.completed_at !== null
   const overdue = activity.due_at !== null && !done && new Date(activity.due_at) < new Date()
@@ -154,17 +222,22 @@ function ActivityItem({
     <li className="rounded-lg border px-3 py-2.5" style={{ borderColor: 'var(--border)' }}>
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-medium">{activity.subject || ACTIVITY_TYPE_LABEL[activity.type]}</span>
-        <span className="tabular shrink-0 text-xs" style={{ color: 'var(--text-subtle)' }}>
-          {formatDateTime(activity.occurred_at)}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="tabular text-xs" style={{ color: 'var(--text-subtle)' }}>
+            {formatDateTime(activity.occurred_at)}
+          </span>
+          <RowAction label="Edit" onClick={onEdit} />
+          <RowAction label="Delete" onClick={onDelete} color="var(--color-stage-lost)" />
+        </div>
       </div>
       <div className="mt-0.5 flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
         <span>{ACTIVITY_TYPE_LABEL[activity.type] ?? activity.type}</span>
+        {activity.contact_name && <span className="shrink-0">· {activity.contact_name}</span>}
         {activity.notes && <span className="truncate">{activity.notes}</span>}
       </div>
 
       {activity.due_at && (
-        <label className="mt-2 flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+        <label className="mt-2 flex w-fit items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
           <input type="checkbox" checked={done} disabled={busy} onChange={onToggleCompleted} />
           <span
             className="tabular"
