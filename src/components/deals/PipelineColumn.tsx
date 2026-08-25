@@ -8,6 +8,8 @@ import type { PipelineStageRow } from '@/types/crm'
 
 interface PipelineColumnProps {
   stage: PipelineStageRow
+  /** Coarse phase colour from stagePhaseColor(), washed behind the header. */
+  phaseColor: string
   deals: DealBoardRow[]
   onCardClick: (deal: DealBoardRow) => void
   onAddClick: (stageId: number) => void
@@ -18,6 +20,7 @@ interface PipelineColumnProps {
 
 export function PipelineColumn({
   stage,
+  phaseColor,
   deals,
   onCardClick,
   onAddClick,
@@ -30,7 +33,15 @@ export function PipelineColumn({
 
   return (
     <div className="flex w-72 shrink-0 flex-col">
-      <div className="flex items-center justify-between px-1 pb-2">
+      <div
+        className="mb-2 flex items-center justify-between rounded-lg border px-2 py-1.5"
+        style={{
+          // A wash, not a fill — the header has to stay quieter than the cards
+          // below it while still reading as its phase at a glance.
+          background: `color-mix(in srgb, ${phaseColor} 10%, transparent)`,
+          borderColor: `color-mix(in srgb, ${phaseColor} 28%, transparent)`,
+        }}
+      >
         <StageBadge stageKey={stage.key} label={stage.label} />
         <span className="tabular text-xs" style={{ color: 'var(--text-subtle)' }}>
           {deals.length} · {formatCents(totalCents)}

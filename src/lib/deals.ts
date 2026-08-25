@@ -23,12 +23,16 @@ export async function listDealsForContact(contactId: string): Promise<DealRow[]>
   return data ?? []
 }
 
-export type DealBoardRow = DealRow & { organisation_name: string; contact_name: string | null }
+export type DealBoardRow = DealRow & {
+  organisation_name: string
+  organisation_website: string | null
+  contact_name: string | null
+}
 
-const BOARD_SELECT = '*, organisations(name), contacts(first_name, last_name)'
+const BOARD_SELECT = '*, organisations(name, website), contacts(first_name, last_name)'
 
 type RawBoardRow = DealRow & {
-  organisations: { name: string }
+  organisations: { name: string; website: string | null }
   contacts: { first_name: string; last_name: string | null } | null
 }
 
@@ -37,6 +41,7 @@ function flattenBoardRow(row: RawBoardRow): DealBoardRow {
   return {
     ...deal,
     organisation_name: organisations.name,
+    organisation_website: organisations.website,
     contact_name: contacts ? fullName(contacts.first_name, contacts.last_name) : null,
   }
 }
