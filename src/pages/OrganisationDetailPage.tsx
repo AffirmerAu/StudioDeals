@@ -162,7 +162,7 @@ export function OrganisationDetailPage() {
       <section className="mt-8 max-w-2xl">
         <h2 className="text-sm font-semibold tracking-tight">Activity</h2>
         <div className="mt-3">
-          <ActivityTimeline organisationId={id} />
+          <ActivityTimeline organisationId={id} logDefaults={{ organisationId: id }} />
         </div>
       </section>
 

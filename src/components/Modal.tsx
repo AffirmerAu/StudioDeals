@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useOverlayLayer } from '@/lib/overlay-stack'
 
 const FOCUSABLE_SELECTOR =
@@ -32,7 +33,10 @@ export function Modal({ open, onClose, title, children, widthClassName = 'max-w-
 
   if (!open) return null
 
-  return (
+  // Portalled to the body because a Drawer's slide transform makes it a
+  // containing block for position:fixed descendants — a Modal opened from
+  // inside one would otherwise be centred on the drawer, not the viewport.
+  return createPortal(
     <div
       className="fixed inset-0 z-40 flex items-center justify-center p-4"
       style={{ background: 'rgb(0 0 0 / 0.5)' }}
@@ -65,6 +69,7 @@ export function Modal({ open, onClose, title, children, widthClassName = 'max-w-
         </div>
         <div className="p-5">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
