@@ -63,3 +63,15 @@ export async function fetchWonValueSince(
   const rows = data ?? []
   return { count: rows.length, valueCents: rows.reduce((sum, row) => sum + row.value_cents, 0) }
 }
+
+/** Deals created since a date — the "new deals this month" tile. Counted with
+ * head:true so the rows themselves never come down the wire. */
+export async function fetchNewDealCountSince(sinceISODate: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('deals')
+    .select('id', { count: 'exact', head: true })
+    .gte('created_at', sinceISODate)
+
+  if (error) throw error
+  return count ?? 0
+}

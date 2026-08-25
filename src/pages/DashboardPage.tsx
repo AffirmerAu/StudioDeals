@@ -3,6 +3,7 @@ import { usePipelineStages } from '@/lib/pipeline-stages'
 import { useToast } from '@/lib/toast-context'
 import {
   fetchDealsNeedingAttention,
+  fetchNewDealCountSince,
   fetchOpenDealValueByStage,
   fetchPendingHandoff,
   fetchPipelineForecast,
@@ -11,7 +12,10 @@ import {
 } from '@/lib/dashboard'
 import { markDealHandedOff } from '@/lib/deals'
 import { listOpenFollowUps, setActivityCompleted, type OpenFollowUpRow } from '@/lib/activities'
+import { fetchTargets, NO_TARGETS, type TargetValues } from '@/lib/targets'
 import { FollowUpsList } from '@/components/FollowUpsList'
+import { TargetTile } from '@/components/TargetTile'
+import { TargetsFormModal } from '@/components/TargetsFormModal'
 import { formatCents, formatDate } from '@/lib/format'
 import { StatTile } from '@/components/StatTile'
 import { SkeletonBlock } from '@/components/Skeleton'
@@ -47,6 +51,9 @@ export function DashboardPage() {
   const [wonThisMonth, setWonThisMonth] = useState({ count: 0, valueCents: 0 })
   const [openFollowUps, setOpenFollowUps] = useState<OpenFollowUpRow[]>([])
   const [followUpBusyId, setFollowUpBusyId] = useState<string | null>(null)
+  const [newDealsThisMonth, setNewDealsThisMonth] = useState(0)
+  const [targets, setTargets] = useState<TargetValues>(NO_TARGETS)
+  const [targetsOpen, setTargetsOpen] = useState(false)
   const [handoffDeal, setHandoffDeal] = useState<PendingHandoffRow | null>(null)
   const [handoffBusy, setHandoffBusy] = useState(false)
 
@@ -63,8 +70,10 @@ export function DashboardPage() {
       fetchPendingHandoff(),
       fetchWonValueSince(wonStageIds, startOfMonthISO()),
       listOpenFollowUps(),
+      fetchNewDealCountSince(startOfMonthISO()),
+      fetchTargets(),
     ])
-      .then(([values, forecastRows, attention, handoff, won, followUps]) => {
+      .then(([values, forecastRows, attention, handoff, won, followUps, newDeals, targetValues]) => {
         if (cancelled) return
         setStageValues(values)
         setForecast(forecastRows)
@@ -72,6 +81,8 @@ export function DashboardPage() {
         setPendingHandoff(handoff)
         setWonThisMonth(won)
         setOpenFollowUps(followUps)
+        setNewDealsThisMonth(newDeals)
+        setTargets(targetValues)
       })
       .catch((error: unknown) => {
         if (!cancelled) showToast(error instanceof Error ? error.message : 'Failed to load dashboard', 'error')
@@ -140,12 +151,47 @@ export function DashboardPage() {
 
   return (
     <div className="p-8">
-      <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
+      <div className="flex items-center justify-between gap-4">
+        <h1 className="text-xl font-semibold tracking-tight">Dashboard</h1>
+        <button
+          type="button"
+          onClick={() => setTargetsOpen(true)}
+          className="rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors duration-150"
+          style={{ borderColor: 'var(--border)', color: 'var(--text)' }}
+        >
+          Set targets
+        </button>
+      </div>
 
-      <div className="mt-5 grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+        <TargetTile
+          label="New deals this month"
+          value={String(newDealsThisMonth)}
+          target={String(targets.new_deals_per_month)}
+          progress={newDealsThisMonth}
+          targetRaw={targets.new_deals_per_month}
+        />
+        <TargetTile
+          label="Deals won this month"
+          value={String(wonThisMonth.count)}
+          target={String(targets.won_deals_per_month)}
+          progress={wonThisMonth.count}
+          targetRaw={targets.won_deals_per_month}
+        />
+        <TargetTile
+          label="Value won this month"
+          value={formatCents(wonThisMonth.valueCents)}
+          target={formatCents(targets.won_value_cents_per_month)}
+          progress={wonThisMonth.valueCents}
+          targetRaw={targets.won_value_cents_per_month}
+        />
+      </div>
+
+      {/* "Won this month" used to live here; the Value won this month tile
+          above is the same figure with a target attached. */}
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
         <StatTile label="Open pipeline value" value={formatCents(openValueCents)} />
         <StatTile label="Weighted forecast" value={formatCents(weightedForecastCents)} />
-        <StatTile label="Won this month" value={formatCents(wonThisMonth.valueCents)} />
         <StatTile label="Pending handoff" value={String(pendingHandoff.length)} />
       </div>
 
@@ -207,6 +253,13 @@ export function DashboardPage() {
           )}
         </div>
       </div>
+
+      <TargetsFormModal
+        open={targetsOpen}
+        targets={targets}
+        onClose={() => setTargetsOpen(false)}
+        onSaved={setTargets}
+      />
 
       <ConfirmDialog
         open={handoffDeal !== null}
