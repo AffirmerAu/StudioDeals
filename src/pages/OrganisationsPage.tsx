@@ -9,7 +9,9 @@ import {
 import type { OrganisationSummaryRow } from '@/types/crm'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 import { formatCents } from '@/lib/format'
+import { listDuplicateOrgPairs, type DuplicateOrgPair } from '@/lib/duplicates'
 import { CompanyLogo } from '@/components/CompanyLogo'
+import { DuplicatesModal } from '@/components/organisations/DuplicatesModal'
 import { EmptyState } from '@/components/EmptyState'
 import { SkeletonTableRows } from '@/components/Skeleton'
 import { Pagination } from '@/components/Pagination'
@@ -30,11 +32,19 @@ export function OrganisationsPage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
+  const [duplicates, setDuplicates] = useState<DuplicateOrgPair[]>([])
+  const [duplicatesOpen, setDuplicatesOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
   useEffect(() => {
     listIndustries().then(setIndustries).catch(() => setIndustries([]))
   }, [])
+
+  // Fails soft: duplicate detection is a nicety, and before migration 006 the
+  // merge function isn't there to act on what it finds anyway.
+  useEffect(() => {
+    listDuplicateOrgPairs().then(setDuplicates).catch(() => setDuplicates([]))
+  }, [refreshKey])
 
   useEffect(() => {
     setPage(0)
@@ -74,6 +84,17 @@ export function OrganisationsPage() {
     <div className="p-8">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-xl font-semibold tracking-tight">Organisations</h1>
+        <div className="flex items-center gap-2">
+          {duplicates.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setDuplicatesOpen(true)}
+              className="rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors duration-150"
+              style={{ borderColor: 'var(--color-stage-verbal)', color: 'var(--color-stage-verbal)' }}
+            >
+              {duplicates.length} possible {duplicates.length === 1 ? 'duplicate' : 'duplicates'}
+            </button>
+          )}
         <button
           type="button"
           onClick={() => setAddOpen(true)}
@@ -82,6 +103,7 @@ export function OrganisationsPage() {
         >
           New organisation
         </button>
+        </div>
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-3">
@@ -173,6 +195,18 @@ export function OrganisationsPage() {
       {!loading && rows.length > 0 && (
         <Pagination page={page} pageSize={ORGANISATIONS_PAGE_SIZE} total={total} onPageChange={setPage} />
       )}
+
+      <DuplicatesModal
+        open={duplicatesOpen}
+        pairs={duplicates}
+        onClose={() => setDuplicatesOpen(false)}
+        onMerged={(pair) => {
+          setDuplicates((current) => current.filter((p) => !(p.idA === pair.idA && p.idB === pair.idB)))
+          // The merged organisation is gone and the survivor's counts have
+          // moved, so the table behind the modal is stale.
+          setRefreshKey((k) => k + 1)
+        }}
+      />
 
       <OrganisationFormModal
         open={addOpen}

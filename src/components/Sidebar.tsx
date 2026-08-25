@@ -5,6 +5,7 @@ import { applyTheme, getStoredTheme, type Theme } from '@/lib/theme'
 import {
   ContactsIcon,
   DashboardIcon,
+  DealsIcon,
   MoonIcon,
   OrganisationsIcon,
   PipelineIcon,
@@ -15,6 +16,7 @@ import {
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: DashboardIcon, end: true },
   { to: '/pipeline', label: 'Pipeline', icon: PipelineIcon, end: false },
+  { to: '/deals', label: 'Deals', icon: DealsIcon, end: false },
   { to: '/contacts', label: 'Contacts', icon: ContactsIcon, end: false },
   { to: '/organisations', label: 'Organisations', icon: OrganisationsIcon, end: false },
 ] as const
