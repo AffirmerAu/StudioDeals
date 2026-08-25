@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { DealRow } from '@/types/database'
+import type { DealRow } from '@/types/crm'
 
 export async function listDealsForOrganisation(organisationId: string): Promise<DealRow[]> {
   const { data, error } = await supabase

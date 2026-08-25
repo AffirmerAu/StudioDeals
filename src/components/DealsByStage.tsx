@@ -2,7 +2,7 @@ import { usePipelineStages } from '@/lib/pipeline-stages'
 import { formatCents, formatDate } from '@/lib/format'
 import { StageBadge } from '@/components/StageBadge'
 import { EmptyState } from '@/components/EmptyState'
-import type { DealRow } from '@/types/database'
+import type { DealRow } from '@/types/crm'
 
 export function DealsByStage({ deals }: { deals: DealRow[] }) {
   const { stages } = usePipelineStages()

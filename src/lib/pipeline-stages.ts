@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { PipelineStageRow } from '@/types/database'
+import type { PipelineStageRow } from '@/types/crm'
 
 let cache: Promise<PipelineStageRow[]> | null = null
 

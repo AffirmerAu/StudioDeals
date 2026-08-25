@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { TagRow } from '@/types/database'
+import type { TagRow } from '@/types/crm'
 
 let cache: Promise<TagRow[]> | null = null
 

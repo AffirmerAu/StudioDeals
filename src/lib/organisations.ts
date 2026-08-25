@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { OrganisationRow, OrganisationSummaryRow } from '@/types/database'
+import type { OrganisationRow, OrganisationSummaryRow } from '@/types/crm'
 
 export const ORGANISATIONS_PAGE_SIZE = 50
 

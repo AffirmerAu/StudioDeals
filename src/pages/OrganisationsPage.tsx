@@ -6,7 +6,7 @@ import {
   ORGANISATIONS_PAGE_SIZE,
   type OrganisationSortColumn,
 } from '@/lib/organisations'
-import type { OrganisationSummaryRow } from '@/types/database'
+import type { OrganisationSummaryRow } from '@/types/crm'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 import { formatCents } from '@/lib/format'
 import { EmptyState } from '@/components/EmptyState'

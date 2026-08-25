@@ -3,7 +3,7 @@ import { listActivities } from '@/lib/activities'
 import { formatDateTime } from '@/lib/format'
 import { EmptyState } from '@/components/EmptyState'
 import { SkeletonBlock } from '@/components/Skeleton'
-import type { ActivityRow } from '@/types/database'
+import type { ActivityRow } from '@/types/crm'
 
 const TYPE_LABEL: Record<ActivityRow['type'], string> = {
   call: 'Call',

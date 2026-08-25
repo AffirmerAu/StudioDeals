@@ -4,7 +4,7 @@ import { Combobox } from '@/components/Combobox'
 import { useToast } from '@/lib/toast-context'
 import { createContact, updateContact, type ContactFormValues } from '@/lib/contacts'
 import { searchOrganisations, type OrganisationOption } from '@/lib/organisations'
-import type { ContactRow } from '@/types/database'
+import type { ContactRow } from '@/types/crm'
 
 interface ContactFormModalProps {
   open: boolean

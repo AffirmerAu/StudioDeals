@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { contactIdsForTag } from '@/lib/tags'
-import type { ContactListRow, ContactRow } from '@/types/database'
+import type { ContactListRow, ContactRow } from '@/types/crm'
 
 export const CONTACTS_PAGE_SIZE = 50
 

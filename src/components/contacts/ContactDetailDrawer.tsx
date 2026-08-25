@@ -10,7 +10,7 @@ import { deleteContact, getContact } from '@/lib/contacts'
 import { listDealsForContact } from '@/lib/deals'
 import { fullName, formatRelativeDays } from '@/lib/format'
 import { useToast } from '@/lib/toast-context'
-import type { ContactListRow, DealRow } from '@/types/database'
+import type { ContactListRow, DealRow } from '@/types/crm'
 
 interface ContactDetailDrawerProps {
   contactId: string | null

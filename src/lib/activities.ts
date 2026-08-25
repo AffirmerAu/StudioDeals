@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { ActivityRow } from '@/types/database'
+import type { ActivityRow } from '@/types/crm'
 
 export const ACTIVITIES_PAGE_SIZE = 20
 

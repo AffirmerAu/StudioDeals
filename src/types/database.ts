@@ -1,245 +1,835 @@
-/**
- * Hand-written to mirror `crm` in migrations/001_initial_schema.sql and
- * migrations/003_phase2_views.sql.
- *
- * Prefer replacing this with the generated file when Supabase CLI access is
- * available (Supabase dashboard -> Integrations -> Data API -> TypeScript).
- * Regenerate after every schema change — this file is not auto-synced.
- */
-
-type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
-
-export type DealType = 'production' | 'prestarter' | 'retainer' | 'other'
-export type ActivityType = 'call' | 'email' | 'meeting' | 'site_visit' | 'quote_sent' | 'note' | 'task'
-export type TagKind = 'label' | 'source' | 'industry' | 'event'
-
-// `type` object literals (not `interface`) deliberately — postgrest-js's
-// generics constrain Row/Insert/Update to `Record<string, unknown>`, and
-// only object-literal type aliases pick up the implicit index signature
-// that satisfies that constraint. An `interface` here silently makes every
-// query resolve to `never`.
-export type OrganisationRow = {
-  id: string
-  name: string
-  industry: string | null
-  website: string | null
-  abn: string | null
-  account_number: string | null
-  address: string | null
-  is_client: boolean
-  notes: string | null
-  legacy_capsule_id: string | null
-  created_at: string
-  updated_at: string
-}
-
-export type ContactRow = {
-  id: string
-  organisation_id: string | null
-  first_name: string
-  last_name: string | null
-  role: string | null
-  email: string | null
-  phone: string | null
-  is_primary: boolean
-  last_contacted_at: string | null
-  notes: string | null
-  legacy_capsule_id: string | null
-  created_at: string
-  updated_at: string
-}
-
-export type DealRow = {
-  id: string
-  title: string
-  organisation_id: string
-  primary_contact_id: string | null
-  stage_id: number
-  deal_type: DealType
-  value_cents: number
-  currency: string
-  expected_close_date: string | null
-  probability_override: number | null
-  board_position: number
-  source: string | null
-  won_at: string | null
-  lost_at: string | null
-  lost_reason: string | null
-  handed_off_at: string | null
-  studiotime_project_id: string | null
-  notes: string | null
-  legacy_capsule_id: string | null
-  created_at: string
-  updated_at: string
-}
-
-export type ActivityRow = {
-  id: string
-  deal_id: string | null
-  contact_id: string | null
-  organisation_id: string | null
-  type: ActivityType
-  subject: string | null
-  notes: string | null
-  occurred_at: string
-  due_at: string | null
-  completed_at: string | null
-  created_by: string | null
-  created_at: string
-}
-
-export type PipelineStageRow = {
-  id: number
-  key: string
-  label: string
-  position: number
-  probability: number
-  is_won: boolean
-  is_lost: boolean
-}
-
-export type TagRow = {
-  id: number
-  label: string
-  kind: TagKind
-}
-
-export type TaggingRow = {
-  id: number
-  tag_id: number
-  organisation_id: string | null
-  contact_id: string | null
-}
-
-export type OrganisationSummaryRow = OrganisationRow & {
-  contact_count: number
-  open_deal_count: number
-  won_value_cents: number
-}
-
-export type ContactListRow = ContactRow & {
-  organisation_name: string | null
-  is_stale: boolean
-}
-
-export type StaleContactRow = ContactRow & {
-  organisation_name: string | null
-  since_contact: string | null
-}
-
-type TableDef<Row, Insert, Update = Partial<Insert>> = {
-  Row: Row
-  Insert: Insert
-  Update: Update
-  Relationships: []
-}
-
-type ViewDef<Row> = { Row: Row; Relationships: [] }
-
-// Columns that are nullable, defaulted, or generated stay optional on
-// Insert — mirrors what `supabase gen types` would produce.
-type OrganisationInsert = Pick<OrganisationRow, 'name'> &
-  Partial<
-    Pick<
-      OrganisationRow,
-      | 'id'
-      | 'industry'
-      | 'website'
-      | 'abn'
-      | 'account_number'
-      | 'address'
-      | 'is_client'
-      | 'notes'
-      | 'legacy_capsule_id'
-      | 'created_at'
-      | 'updated_at'
-    >
-  >
-
-type ContactInsert = Pick<ContactRow, 'first_name'> &
-  Partial<
-    Pick<
-      ContactRow,
-      | 'id'
-      | 'organisation_id'
-      | 'last_name'
-      | 'role'
-      | 'email'
-      | 'phone'
-      | 'is_primary'
-      | 'last_contacted_at'
-      | 'notes'
-      | 'legacy_capsule_id'
-      | 'created_at'
-      | 'updated_at'
-    >
-  >
-
-type DealInsert = Pick<DealRow, 'title' | 'organisation_id'> &
-  Partial<
-    Pick<
-      DealRow,
-      | 'id'
-      | 'primary_contact_id'
-      | 'stage_id'
-      | 'deal_type'
-      | 'value_cents'
-      | 'currency'
-      | 'expected_close_date'
-      | 'probability_override'
-      | 'board_position'
-      | 'source'
-      | 'won_at'
-      | 'lost_at'
-      | 'lost_reason'
-      | 'handed_off_at'
-      | 'studiotime_project_id'
-      | 'notes'
-      | 'legacy_capsule_id'
-      | 'created_at'
-      | 'updated_at'
-    >
-  >
-
-type ActivityInsert = Pick<ActivityRow, 'type'> &
-  Partial<
-    Pick<
-      ActivityRow,
-      | 'id'
-      | 'deal_id'
-      | 'contact_id'
-      | 'organisation_id'
-      | 'subject'
-      | 'notes'
-      | 'occurred_at'
-      | 'due_at'
-      | 'completed_at'
-      | 'created_by'
-      | 'created_at'
-    >
-  >
-
-type TagInsert = Pick<TagRow, 'label'> & Partial<Pick<TagRow, 'id' | 'kind'>>
-type TaggingInsert = Pick<TaggingRow, 'tag_id'> & Partial<Pick<TaggingRow, 'id' | 'organisation_id' | 'contact_id'>>
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.15"
+  }
   crm: {
     Tables: {
-      organisations: TableDef<OrganisationRow, OrganisationInsert>
-      contacts: TableDef<ContactRow, ContactInsert>
-      deals: TableDef<DealRow, DealInsert>
-      activities: TableDef<ActivityRow, ActivityInsert>
-      pipeline_stages: TableDef<PipelineStageRow, PipelineStageRow>
-      tags: TableDef<TagRow, TagInsert>
-      taggings: TableDef<TaggingRow, TaggingInsert>
+      activities: {
+        Row: {
+          completed_at: string | null
+          contact_id: string | null
+          created_at: string
+          created_by: string | null
+          deal_id: string | null
+          due_at: string | null
+          id: string
+          notes: string | null
+          occurred_at: string
+          organisation_id: string | null
+          subject: string | null
+          type: string
+        }
+        Insert: {
+          completed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string | null
+          due_at?: string | null
+          id?: string
+          notes?: string | null
+          occurred_at?: string
+          organisation_id?: string | null
+          subject?: string | null
+          type: string
+        }
+        Update: {
+          completed_at?: string | null
+          contact_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deal_id?: string | null
+          due_at?: string | null
+          id?: string
+          notes?: string | null
+          occurred_at?: string
+          organisation_id?: string | null
+          subject?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "activities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_stale_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "v_deals_needing_attention"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "v_pending_handoff"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_organisation_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_orgs"
+            referencedColumns: ["id_a"]
+          },
+          {
+            foreignKeyName: "activities_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_orgs"
+            referencedColumns: ["id_b"]
+          },
+        ]
+      }
+      contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          first_name: string
+          id: string
+          is_primary: boolean
+          last_contacted_at: string | null
+          last_name: string | null
+          legacy_capsule_id: string | null
+          notes: string | null
+          organisation_id: string | null
+          phone: string | null
+          role: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          first_name: string
+          id?: string
+          is_primary?: boolean
+          last_contacted_at?: string | null
+          last_name?: string | null
+          legacy_capsule_id?: string | null
+          notes?: string | null
+          organisation_id?: string | null
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          first_name?: string
+          id?: string
+          is_primary?: boolean
+          last_contacted_at?: string | null
+          last_name?: string | null
+          legacy_capsule_id?: string | null
+          notes?: string | null
+          organisation_id?: string | null
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_organisation_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_orgs"
+            referencedColumns: ["id_a"]
+          },
+          {
+            foreignKeyName: "contacts_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_orgs"
+            referencedColumns: ["id_b"]
+          },
+        ]
+      }
+      deals: {
+        Row: {
+          board_position: number
+          created_at: string
+          currency: string
+          deal_type: string
+          expected_close_date: string | null
+          handed_off_at: string | null
+          id: string
+          legacy_capsule_id: string | null
+          lost_at: string | null
+          lost_reason: string | null
+          notes: string | null
+          organisation_id: string
+          primary_contact_id: string | null
+          probability_override: number | null
+          source: string | null
+          stage_id: number
+          studiotime_project_id: string | null
+          title: string
+          updated_at: string
+          value_cents: number
+          won_at: string | null
+        }
+        Insert: {
+          board_position?: number
+          created_at?: string
+          currency?: string
+          deal_type?: string
+          expected_close_date?: string | null
+          handed_off_at?: string | null
+          id?: string
+          legacy_capsule_id?: string | null
+          lost_at?: string | null
+          lost_reason?: string | null
+          notes?: string | null
+          organisation_id: string
+          primary_contact_id?: string | null
+          probability_override?: number | null
+          source?: string | null
+          stage_id?: number
+          studiotime_project_id?: string | null
+          title: string
+          updated_at?: string
+          value_cents?: number
+          won_at?: string | null
+        }
+        Update: {
+          board_position?: number
+          created_at?: string
+          currency?: string
+          deal_type?: string
+          expected_close_date?: string | null
+          handed_off_at?: string | null
+          id?: string
+          legacy_capsule_id?: string | null
+          lost_at?: string | null
+          lost_reason?: string | null
+          notes?: string | null
+          organisation_id?: string
+          primary_contact_id?: string | null
+          probability_override?: number | null
+          source?: string | null
+          stage_id?: number
+          studiotime_project_id?: string | null
+          title?: string
+          updated_at?: string
+          value_cents?: number
+          won_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deals_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_organisation_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_orgs"
+            referencedColumns: ["id_a"]
+          },
+          {
+            foreignKeyName: "deals_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_orgs"
+            referencedColumns: ["id_b"]
+          },
+          {
+            foreignKeyName: "deals_primary_contact_id_fkey"
+            columns: ["primary_contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_primary_contact_id_fkey"
+            columns: ["primary_contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_primary_contact_id_fkey"
+            columns: ["primary_contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_stale_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_stage_id_fkey"
+            columns: ["stage_id"]
+            isOneToOne: false
+            referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      merge_log: {
+        Row: {
+          entity_type: string
+          id: string
+          merged_at: string
+          merged_by: string | null
+          merged_id: string
+          merged_snapshot: Json
+          survivor_id: string
+        }
+        Insert: {
+          entity_type: string
+          id?: string
+          merged_at?: string
+          merged_by?: string | null
+          merged_id: string
+          merged_snapshot: Json
+          survivor_id: string
+        }
+        Update: {
+          entity_type?: string
+          id?: string
+          merged_at?: string
+          merged_by?: string | null
+          merged_id?: string
+          merged_snapshot?: Json
+          survivor_id?: string
+        }
+        Relationships: []
+      }
+      organisations: {
+        Row: {
+          abn: string | null
+          account_number: string | null
+          address: string | null
+          created_at: string
+          id: string
+          industry: string | null
+          is_client: boolean
+          legacy_capsule_id: string | null
+          name: string
+          notes: string | null
+          updated_at: string
+          website: string | null
+        }
+        Insert: {
+          abn?: string | null
+          account_number?: string | null
+          address?: string | null
+          created_at?: string
+          id?: string
+          industry?: string | null
+          is_client?: boolean
+          legacy_capsule_id?: string | null
+          name: string
+          notes?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Update: {
+          abn?: string | null
+          account_number?: string | null
+          address?: string | null
+          created_at?: string
+          id?: string
+          industry?: string | null
+          is_client?: boolean
+          legacy_capsule_id?: string | null
+          name?: string
+          notes?: string | null
+          updated_at?: string
+          website?: string | null
+        }
+        Relationships: []
+      }
+      pipeline_stages: {
+        Row: {
+          id: number
+          is_lost: boolean
+          is_won: boolean
+          key: string
+          label: string
+          position: number
+          probability: number
+        }
+        Insert: {
+          id: number
+          is_lost?: boolean
+          is_won?: boolean
+          key: string
+          label: string
+          position: number
+          probability?: number
+        }
+        Update: {
+          id?: number
+          is_lost?: boolean
+          is_won?: boolean
+          key?: string
+          label?: string
+          position?: number
+          probability?: number
+        }
+        Relationships: []
+      }
+      taggings: {
+        Row: {
+          contact_id: string | null
+          id: number
+          organisation_id: string | null
+          tag_id: number
+        }
+        Insert: {
+          contact_id?: string | null
+          id?: number
+          organisation_id?: string | null
+          tag_id: number
+        }
+        Update: {
+          contact_id?: string | null
+          id?: number
+          organisation_id?: string | null
+          tag_id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "taggings_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "taggings_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts_list"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "taggings_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_stale_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "taggings_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "taggings_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_organisation_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "taggings_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_orgs"
+            referencedColumns: ["id_a"]
+          },
+          {
+            foreignKeyName: "taggings_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_orgs"
+            referencedColumns: ["id_b"]
+          },
+          {
+            foreignKeyName: "taggings_tag_id_fkey"
+            columns: ["tag_id"]
+            isOneToOne: false
+            referencedRelation: "tags"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tags: {
+        Row: {
+          id: number
+          kind: string
+          label: string
+        }
+        Insert: {
+          id?: number
+          kind?: string
+          label: string
+        }
+        Update: {
+          id?: number
+          kind?: string
+          label?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
-      v_organisation_summary: ViewDef<OrganisationSummaryRow>
-      v_contacts_list: ViewDef<ContactListRow>
-      v_stale_contacts: ViewDef<StaleContactRow>
+      v_contacts_list: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          first_name: string | null
+          id: string | null
+          is_client: boolean | null
+          is_primary: boolean | null
+          last_contacted_at: string | null
+          last_name: string | null
+          notes: string | null
+          organisation_id: string | null
+          organisation_industry: string | null
+          organisation_name: string | null
+          phone: string | null
+          role: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_organisation_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_orgs"
+            referencedColumns: ["id_a"]
+          },
+          {
+            foreignKeyName: "contacts_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_orgs"
+            referencedColumns: ["id_b"]
+          },
+        ]
+      }
+      v_deals_needing_attention: {
+        Row: {
+          close_date_passed: boolean | null
+          id: string | null
+          missing_close_date: boolean | null
+          missing_value: boolean | null
+          organisation_name: string | null
+          stage: string | null
+          title: string | null
+        }
+        Relationships: []
+      }
+      v_organisation_summary: {
+        Row: {
+          abn: string | null
+          account_number: string | null
+          address: string | null
+          contact_count: number | null
+          created_at: string | null
+          deal_count: number | null
+          id: string | null
+          industry: string | null
+          is_client: boolean | null
+          last_contacted_at: string | null
+          name: string | null
+          notes: string | null
+          open_deal_count: number | null
+          open_value_cents: number | null
+          website: string | null
+          won_value_cents: number | null
+        }
+        Relationships: []
+      }
+      v_pending_handoff: {
+        Row: {
+          id: string | null
+          organisation_name: string | null
+          title: string | null
+          won_at: string | null
+        }
+        Relationships: []
+      }
+      v_pipeline_forecast: {
+        Row: {
+          deal_count: number | null
+          deal_type: string | null
+          forecast_month: string | null
+          gross_value_cents: number | null
+          weighted_value_cents: number | null
+        }
+        Relationships: []
+      }
+      v_possible_duplicate_orgs: {
+        Row: {
+          id_a: string | null
+          id_b: string | null
+          name_a: string | null
+          name_b: string | null
+          score: number | null
+        }
+        Relationships: []
+      }
+      v_stale_contacts: {
+        Row: {
+          created_at: string | null
+          email: string | null
+          first_name: string | null
+          id: string | null
+          is_primary: boolean | null
+          last_contacted_at: string | null
+          last_name: string | null
+          legacy_capsule_id: string | null
+          notes: string | null
+          organisation_id: string | null
+          organisation_name: string | null
+          phone: string | null
+          role: string | null
+          since_contact: string | null
+          updated_at: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "contacts_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "organisations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_organisation_summary"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "contacts_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_orgs"
+            referencedColumns: ["id_a"]
+          },
+          {
+            foreignKeyName: "contacts_organisation_id_fkey"
+            columns: ["organisation_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_orgs"
+            referencedColumns: ["id_b"]
+          },
+        ]
+      }
     }
-    Functions: Record<string, { Args: Record<string, Json>; Returns: Json }>
-    Enums: Record<string, never>
-    CompositeTypes: Record<string, never>
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
 }
+
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
+
+export type Tables<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])
+    ? (DefaultSchema["Tables"] &
+        DefaultSchema["Views"])[DefaultSchemaTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  DefaultSchemaTableNameOrOptions extends
+    | keyof DefaultSchema["Tables"]
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : DefaultSchemaTableNameOrOptions extends keyof DefaultSchema["Tables"]
+    ? DefaultSchema["Tables"][DefaultSchemaTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  DefaultSchemaEnumNameOrOptions extends
+    | keyof DefaultSchema["Enums"]
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
+    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof DefaultSchema["CompositeTypes"]
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof DatabaseWithoutInternals
+  }
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
+    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
+
+export const Constants = {
+  crm: {
+    Enums: {},
+  },
+} as const

@@ -16,7 +16,7 @@ import { SortableHeader, type SortState } from '@/components/SortableHeader'
 import { Combobox } from '@/components/Combobox'
 import { ContactFormModal } from '@/components/contacts/ContactFormModal'
 import { ContactDetailDrawer } from '@/components/contacts/ContactDetailDrawer'
-import type { ContactListRow } from '@/types/database'
+import type { ContactListRow } from '@/types/crm'
 
 export function ContactsPage() {
   const navigate = useNavigate()

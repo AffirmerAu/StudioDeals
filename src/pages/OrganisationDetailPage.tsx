@@ -11,7 +11,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { DealsByStage } from '@/components/DealsByStage'
 import { ActivityTimeline } from '@/components/ActivityTimeline'
 import { OrganisationFormModal } from '@/components/organisations/OrganisationFormModal'
-import type { ContactRow, DealRow, OrganisationRow, TagRow } from '@/types/database'
+import type { ContactRow, DealRow, OrganisationRow, TagRow } from '@/types/crm'
 
 export function OrganisationDetailPage() {
   const { id } = useParams<{ id: string }>()

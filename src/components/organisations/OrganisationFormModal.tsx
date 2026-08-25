@@ -2,7 +2,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react'
 import { Modal } from '@/components/Modal'
 import { useToast } from '@/lib/toast-context'
 import { createOrganisation, updateOrganisation, type OrganisationFormValues } from '@/lib/organisations'
-import type { OrganisationRow } from '@/types/database'
+import type { OrganisationRow } from '@/types/crm'
 
 interface OrganisationFormModalProps {
   open: boolean
