@@ -132,7 +132,10 @@ export function ContactDetailDrawer({ contactId, onClose, onChanged }: ContactDe
             <section>
               <h3 className="text-sm font-semibold tracking-tight">Activity</h3>
               <div className="mt-3">
-                <ActivityTimeline contactId={contact.id} />
+                <ActivityTimeline
+                  contactId={contact.id}
+                  logDefaults={{ contactId: contact.id, organisationId: contact.organisation_id }}
+                />
               </div>
             </section>
           </div>

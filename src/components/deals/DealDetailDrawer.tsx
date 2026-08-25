@@ -96,7 +96,15 @@ export function DealDetailDrawer({ deal, stages, onClose, onEdit }: DealDetailDr
           <section>
             <h3 className="text-sm font-semibold tracking-tight">Activity</h3>
             <div className="mt-3">
-              <ActivityTimeline dealId={deal.id} />
+              <ActivityTimeline
+                dealId={deal.id}
+                logDefaults={{
+                  dealId: deal.id,
+                  organisationId: deal.organisation_id,
+                  contactId: deal.primary_contact_id,
+                  contactName: deal.contact_name,
+                }}
+              />
             </div>
           </section>
         </div>
