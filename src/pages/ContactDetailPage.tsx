@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useToast } from '@/lib/toast-context'
 import { deleteContact, getContact, updateContact } from '@/lib/contacts'
+import { fetchTagsFor } from '@/lib/tags'
 import { listDealsForContact } from '@/lib/deals'
 import { fullName, formatRelativeDays } from '@/lib/format'
 import type { OrganisationOption } from '@/lib/organisations'
@@ -10,6 +11,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { DealsByStage } from '@/components/DealsByStage'
 import { ActivityTimeline } from '@/components/ActivityTimeline'
+import { TagEditor } from '@/components/TagEditor'
 import { BackLink, MetaRow, SaveBar, useBackTarget, type BackTarget } from '@/components/RecordPage'
 import { ContactFields } from '@/components/contacts/ContactFields'
 import {
@@ -17,7 +19,7 @@ import {
   toContactFormState,
   type ContactFormState,
 } from '@/components/contacts/contact-form'
-import type { ContactListRow, DealRow } from '@/types/crm'
+import type { ContactListRow, DealRow, TagRow } from '@/types/crm'
 
 function toOrganisationOption(contact: ContactListRow): OrganisationOption | null {
   if (!contact.organisation_id) return null
@@ -32,6 +34,7 @@ export function ContactDetailPage() {
 
   const [contact, setContact] = useState<ContactListRow | null>(null)
   const [deals, setDeals] = useState<DealRow[]>([])
+  const [tags, setTags] = useState<TagRow[]>([])
   const [loading, setLoading] = useState(true)
   const [notFound, setNotFound] = useState(false)
 
@@ -47,8 +50,12 @@ export function ContactDetailPage() {
     let cancelled = false
     setLoading(true)
     setNotFound(false)
-    Promise.all([getContact(contactId), listDealsForContact(contactId)])
-      .then(([row, dealRows]) => {
+    Promise.all([
+      getContact(contactId),
+      listDealsForContact(contactId),
+      fetchTagsFor({ kind: 'contact', id: contactId }),
+    ])
+      .then(([row, dealRows, tagRows]) => {
         if (cancelled) return
         if (!row) {
           setNotFound(true)
@@ -58,6 +65,7 @@ export function ContactDetailPage() {
         setForm(toContactFormState(row))
         setOrganisation(toOrganisationOption(row))
         setDeals(dealRows)
+        setTags(tagRows)
       })
       .catch((error: unknown) => {
         if (!cancelled) showToast(error instanceof Error ? error.message : 'Failed to load contact', 'error')
@@ -168,6 +176,9 @@ export function ContactDetailPage() {
                   {contact.email}
                 </a>
               )}
+            </div>
+            <div className="mt-2">
+              <TagEditor target={{ kind: 'contact', id: contact.id }} tags={tags} onChange={setTags} />
             </div>
           </div>
 

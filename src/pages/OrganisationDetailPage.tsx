@@ -3,11 +3,11 @@ import { Link, useParams } from 'react-router-dom'
 import { getOrganisation, updateOrganisation } from '@/lib/organisations'
 import { listContactsForOrganisation } from '@/lib/contacts'
 import { listDealsForOrganisation } from '@/lib/deals'
-import { fetchOrganisationTags } from '@/lib/tags'
+import { fetchTagsFor } from '@/lib/tags'
 import { fullName } from '@/lib/format'
 import { useToast } from '@/lib/toast-context'
 import { SkeletonBlock } from '@/components/Skeleton'
-import { TagPill } from '@/components/TagPill'
+import { TagEditor } from '@/components/TagEditor'
 import { EmptyState } from '@/components/EmptyState'
 import { CompanyLogo } from '@/components/CompanyLogo'
 import { DealsByStage } from '@/components/DealsByStage'
@@ -43,7 +43,7 @@ export function OrganisationDetailPage() {
     setNotFound(false)
     Promise.all([
       getOrganisation(id),
-      fetchOrganisationTags(id),
+      fetchTagsFor({ kind: 'organisation', id }),
       listContactsForOrganisation(id),
       listDealsForOrganisation(id),
     ])
@@ -138,13 +138,9 @@ export function OrganisationDetailPage() {
               )}
               {!org.is_client && <span>Prospect</span>}
             </div>
-            {tags.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {tags.map((tag) => (
-                  <TagPill key={tag.id} label={tag.label} />
-                ))}
-              </div>
-            )}
+            <div className="mt-2">
+              <TagEditor target={{ kind: 'organisation', id }} tags={tags} onChange={setTags} />
+            </div>
           </div>
         </div>
 
