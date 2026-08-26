@@ -11,7 +11,6 @@ interface PipelineColumnProps {
   deals: DealBoardRow[]
   onCardClick: (deal: DealBoardRow) => void
   onAddClick: (stageId: number) => void
-  onViewDeal: (deal: DealBoardRow) => void
   onMarkWon: (deal: DealBoardRow) => void
   onMarkLost: (deal: DealBoardRow) => void
   onDeleteDeal: (deal: DealBoardRow) => void
@@ -22,7 +21,6 @@ export function PipelineColumn({
   deals,
   onCardClick,
   onAddClick,
-  onViewDeal,
   onMarkWon,
   onMarkLost,
   onDeleteDeal,
@@ -61,8 +59,7 @@ export function PipelineColumn({
               stageColor={color}
               onClick={() => onCardClick(deal)}
               menu={{
-                onEdit: () => onCardClick(deal),
-                onView: () => onViewDeal(deal),
+                onOpen: () => onCardClick(deal),
                 onMarkWon: () => onMarkWon(deal),
                 onMarkLost: () => onMarkLost(deal),
                 onDelete: () => onDeleteDeal(deal),

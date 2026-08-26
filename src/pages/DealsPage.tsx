@@ -1,15 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { usePipelineStages } from '@/lib/pipeline-stages'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 import { useToast } from '@/lib/toast-context'
-import {
-  DEALS_PAGE_SIZE,
-  deleteDeal,
-  listDeals,
-  type DealBoardRow,
-  type DealSortColumn,
-} from '@/lib/deals'
+import { DEALS_PAGE_SIZE, listDeals, type DealBoardRow, type DealSortColumn } from '@/lib/deals'
 import { formatCents, formatDate } from '@/lib/format'
 import { CompanyLogo } from '@/components/CompanyLogo'
 import { EmptyState } from '@/components/EmptyState'
@@ -17,9 +11,6 @@ import { SkeletonTableRows } from '@/components/Skeleton'
 import { Pagination } from '@/components/Pagination'
 import { SortableHeader, type SortState } from '@/components/SortableHeader'
 import { StageBadge } from '@/components/StageBadge'
-import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { DealDetailDrawer } from '@/components/deals/DealDetailDrawer'
-import { DealFormModal } from '@/components/deals/DealFormModal'
 
 const DEAL_TYPE_OPTIONS = [
   { value: '', label: 'All deal types' },
@@ -29,6 +20,8 @@ const DEAL_TYPE_OPTIONS = [
   { value: 'other', label: 'Other' },
 ]
 
+const BACK_TO_DEALS = { to: '/deals', label: 'Deals' }
+
 const STATUS_OPTIONS = [
   { value: 'open', label: 'Open' },
   { value: '', label: 'All statuses' },
@@ -37,6 +30,7 @@ const STATUS_OPTIONS = [
 ]
 
 export function DealsPage() {
+  const navigate = useNavigate()
   const { showToast } = useToast()
   const { stages, loading: stagesLoading } = usePipelineStages()
 
@@ -53,11 +47,6 @@ export function DealsPage() {
   // stages only ever grow.
   const [status, setStatus] = useState('open')
   const [sort, setSort] = useState<SortState<DealSortColumn>>({ column: 'expected_close_date', ascending: true })
-
-  const [viewingDeal, setViewingDeal] = useState<DealBoardRow | null>(null)
-  const [editingDeal, setEditingDeal] = useState<DealBoardRow | null>(null)
-  const [deletingDeal, setDeletingDeal] = useState<DealBoardRow | null>(null)
-  const [deleteBusy, setDeleteBusy] = useState(false)
 
   const wonStageIds = stages.filter((s) => s.is_won).map((s) => s.id)
   const lostStageIds = stages.filter((s) => s.is_lost).map((s) => s.id)
@@ -99,23 +88,6 @@ export function DealsPage() {
   const resetting = <T,>(setter: (value: T) => void) => (value: T) => {
     setter(value)
     setPage(0)
-  }
-
-  const handleConfirmDelete = async () => {
-    if (!deletingDeal) return
-    setDeleteBusy(true)
-    try {
-      await deleteDeal(deletingDeal.id)
-      setRows((current) => current.filter((d) => d.id !== deletingDeal.id))
-      setTotal((current) => Math.max(0, current - 1))
-      setViewingDeal((current) => (current?.id === deletingDeal.id ? null : current))
-      showToast('Deal deleted')
-      setDeletingDeal(null)
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to delete deal', 'error')
-    } finally {
-      setDeleteBusy(false)
-    }
   }
 
   const toggleSort = (column: DealSortColumn) => {
@@ -214,7 +186,7 @@ export function DealsPage() {
                 return (
                   <tr
                     key={deal.id}
-                    onClick={() => setViewingDeal(deal)}
+                    onClick={() => navigate(`/deals/${deal.id}`, { state: { from: BACK_TO_DEALS } })}
                     className="cursor-pointer border-b transition-colors duration-150 last:border-b-0"
                     style={{ borderColor: 'var(--border)' }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
@@ -223,7 +195,7 @@ export function DealsPage() {
                     <td className="px-4 py-3 font-medium">{deal.title}</td>
                     <td className="px-4 py-3">
                       {/* stopPropagation so following the link doesn't also
-                          open the drawer behind it. */}
+                          trigger the row's own navigation to the deal. */}
                       <Link
                         to={`/organisations/${deal.organisation_id}`}
                         onClick={(e) => e.stopPropagation()}
@@ -238,6 +210,7 @@ export function DealsPage() {
                       {deal.primary_contact_id && deal.contact_name ? (
                         <Link
                           to={`/contacts/${deal.primary_contact_id}`}
+                          state={{ from: BACK_TO_DEALS }}
                           onClick={(e) => e.stopPropagation()}
                           style={{ color: 'var(--color-brand-500)' }}
                         >
@@ -268,46 +241,6 @@ export function DealsPage() {
       <div className="mt-4">
         <Pagination page={page} pageSize={DEALS_PAGE_SIZE} total={total} onPageChange={setPage} />
       </div>
-
-      <DealDetailDrawer
-        deal={viewingDeal}
-        stages={stages}
-        onClose={() => setViewingDeal(null)}
-        onEdit={setEditingDeal}
-        onDelete={setDeletingDeal}
-      />
-
-      <DealFormModal
-        open={editingDeal !== null}
-        deal={editingDeal}
-        defaultStageId={editingDeal?.stage_id ?? stages[0]?.id ?? 1}
-        // Only consulted when creating, which this page never does.
-        computeCreatePosition={() => 1000}
-        onClose={() => setEditingDeal(null)}
-        onSaved={(saved) => {
-          setRows((current) => current.map((d) => (d.id === saved.id ? saved : d)))
-          setViewingDeal((current) => (current?.id === saved.id ? saved : current))
-          setEditingDeal(null)
-        }}
-        onSaveFailed={(previous) => {
-          setRows((current) => current.map((d) => (d.id === previous.id ? previous : d)))
-        }}
-      />
-
-      <ConfirmDialog
-        open={deletingDeal !== null}
-        title="Delete deal"
-        message={
-          deletingDeal
-            ? `Delete "${deletingDeal.title}"? Any activities logged against it are deleted too. This can't be undone.`
-            : ''
-        }
-        confirmLabel="Delete"
-        danger
-        busy={deleteBusy}
-        onConfirm={handleConfirmDelete}
-        onClose={() => setDeletingDeal(null)}
-      />
     </div>
   )
 }

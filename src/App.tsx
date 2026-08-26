@@ -12,7 +12,13 @@ import { LoginPage } from '@/pages/LoginPage'
 const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
 const PipelinePage = lazy(() => import('@/pages/PipelinePage').then((m) => ({ default: m.PipelinePage })))
 const DealsPage = lazy(() => import('@/pages/DealsPage').then((m) => ({ default: m.DealsPage })))
+const DealDetailPage = lazy(() =>
+  import('@/pages/DealDetailPage').then((m) => ({ default: m.DealDetailPage })),
+)
 const ContactsPage = lazy(() => import('@/pages/ContactsPage').then((m) => ({ default: m.ContactsPage })))
+const ContactDetailPage = lazy(() =>
+  import('@/pages/ContactDetailPage').then((m) => ({ default: m.ContactDetailPage })),
+)
 const OrganisationsPage = lazy(() =>
   import('@/pages/OrganisationsPage').then((m) => ({ default: m.OrganisationsPage })),
 )
@@ -30,8 +36,9 @@ export default function App() {
           <Route index element={<DashboardPage />} />
           <Route path="pipeline" element={<PipelinePage />} />
           <Route path="deals" element={<DealsPage />} />
+          <Route path="deals/:dealId" element={<DealDetailPage />} />
           <Route path="contacts" element={<ContactsPage />} />
-          <Route path="contacts/:contactId" element={<ContactsPage />} />
+          <Route path="contacts/:contactId" element={<ContactDetailPage />} />
           <Route path="organisations" element={<OrganisationsPage />} />
           <Route path="organisations/:id" element={<OrganisationDetailPage />} />
         </Route>

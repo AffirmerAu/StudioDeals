@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import {
   DndContext,
   DragOverlay,
@@ -31,7 +31,6 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { LostReasonDialog } from '@/components/deals/LostReasonDialog'
 import { PipelineColumn } from '@/components/deals/PipelineColumn'
 import { DealCardContent } from '@/components/deals/DealCard'
-import { DealDetailDrawer } from '@/components/deals/DealDetailDrawer'
 import { DealFormModal } from '@/components/deals/DealFormModal'
 import type { PipelineStageRow } from '@/types/crm'
 
@@ -43,6 +42,8 @@ const DEAL_TYPE_OPTIONS = [
   { value: 'other', label: 'Other' },
 ]
 
+const BACK_TO_PIPELINE = { to: '/pipeline', label: 'Pipeline' }
+
 const SHOW_WON_KEY = 'studiodeals-pipeline-show-won'
 const SHOW_LOST_KEY = 'studiodeals-pipeline-show-lost'
 
@@ -53,7 +54,7 @@ function getStoredFlag(key: string): boolean {
 export function PipelinePage() {
   const { showToast } = useToast()
   const { stages, loading: stagesLoading } = usePipelineStages()
-  const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
 
   const [deals, setDeals] = useState<DealBoardRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -67,10 +68,8 @@ export function PipelinePage() {
   const [showLost, setShowLost] = useState(() => getStoredFlag(SHOW_LOST_KEY))
 
   const [activeDeal, setActiveDeal] = useState<DealBoardRow | null>(null)
-  const [modalOpen, setModalOpen] = useState(false)
-  const [editingDeal, setEditingDeal] = useState<DealBoardRow | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
   const [createStageId, setCreateStageId] = useState<number | null>(null)
-  const [viewingDeal, setViewingDeal] = useState<DealBoardRow | null>(null)
 
   const [handoffDeal, setHandoffDeal] = useState<DealBoardRow | null>(null)
   const [handoffBusy, setHandoffBusy] = useState(false)
@@ -104,22 +103,6 @@ export function PipelinePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  // Deep link from the Dashboard's "needs attention" list.
-  useEffect(() => {
-    const dealId = searchParams.get('dealId')
-    if (!dealId || loading) return
-    const found = deals.find((d) => d.id === dealId)
-    if (found) {
-      setEditingDeal(found)
-      setModalOpen(true)
-    }
-    setSearchParams((params) => {
-      params.delete('dealId')
-      return params
-    })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading])
 
   const filteredDeals = useMemo(() => {
     let result = deals
@@ -186,15 +169,12 @@ export function PipelinePage() {
   }
 
   const openCreateModal = (stageId: number) => {
-    setEditingDeal(null)
     setCreateStageId(stageId)
-    setModalOpen(true)
+    setCreateOpen(true)
   }
 
-  const openEditModal = (deal: DealBoardRow) => {
-    setEditingDeal(deal)
-    setCreateStageId(null)
-    setModalOpen(true)
+  const openDeal = (deal: DealBoardRow) => {
+    navigate(`/deals/${deal.id}`, { state: { from: BACK_TO_PIPELINE } })
   }
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -253,7 +233,6 @@ export function PipelinePage() {
         ...(stage.is_lost ? { lost_reason: lostReason ?? null } : {}),
       })
       setDeals((current) => current.map((d) => (d.id === saved.id ? saved : d)))
-      setViewingDeal((current) => (current?.id === saved.id ? saved : current))
       showToast(`Marked as ${stage.label}`)
       maybePromptHandoff(previousStageId, saved)
     } catch (error) {
@@ -287,8 +266,6 @@ export function PipelinePage() {
     try {
       await deleteDeal(deletingDeal.id)
       setDeals((current) => current.filter((d) => d.id !== deletingDeal.id))
-      // Whatever was open about this deal is now about nothing.
-      setViewingDeal((current) => (current?.id === deletingDeal.id ? null : current))
       showToast('Deal deleted')
       setDeletingDeal(null)
     } catch (error) {
@@ -399,9 +376,8 @@ export function PipelinePage() {
                 key={stage.id}
                 stage={stage}
                 deals={columns.get(stage.id) ?? []}
-                onCardClick={openEditModal}
+                onCardClick={openDeal}
                 onAddClick={openCreateModal}
-                onViewDeal={setViewingDeal}
                 onMarkWon={(deal) => wonStage && void handleMarkStage(deal, wonStage)}
                 onMarkLost={(deal) => lostStage && setLostPrompt({ deal, stage: lostStage })}
                 onDeleteDeal={setDeletingDeal}
@@ -413,31 +389,15 @@ export function PipelinePage() {
       )}
 
       <DealFormModal
-        open={modalOpen}
-        deal={editingDeal}
+        open={createOpen}
         defaultStageId={createStageId ?? stages[0]?.id ?? 1}
         computeCreatePosition={(stageId) => computeBoardPosition(columns.get(stageId) ?? [], (columns.get(stageId) ?? []).length)}
-        onClose={() => setModalOpen(false)}
-        onSaved={(saved) => {
-          setDeals((current) => {
-            const exists = current.some((d) => d.id === saved.id)
-            return exists ? current.map((d) => (d.id === saved.id ? saved : d)) : [...current, saved]
-          })
-          setViewingDeal((current) => (current?.id === saved.id ? saved : current))
-          setModalOpen(false)
-          maybePromptHandoff(editingDeal?.stage_id ?? null, saved)
+        onClose={() => setCreateOpen(false)}
+        onCreated={(created) => {
+          setDeals((current) => [...current, created])
+          setCreateOpen(false)
+          maybePromptHandoff(null, created)
         }}
-        onSaveFailed={(previous) => {
-          setDeals((current) => current.map((d) => (d.id === previous.id ? previous : d)))
-        }}
-      />
-
-      <DealDetailDrawer
-        deal={viewingDeal}
-        stages={stages}
-        onClose={() => setViewingDeal(null)}
-        onEdit={openEditModal}
-        onDelete={setDeletingDeal}
       />
 
       <LostReasonDialog

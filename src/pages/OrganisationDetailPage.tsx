@@ -130,6 +130,7 @@ export function OrganisationDetailPage() {
                 <li key={contact.id}>
                   <Link
                     to={`/contacts/${contact.id}`}
+                    state={{ from: { to: `/organisations/${id}`, label: org.name } }}
                     className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5 transition-colors duration-150"
                     style={{ borderColor: 'var(--border)' }}
                   >
