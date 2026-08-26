@@ -22,6 +22,7 @@ const ContactDetailPage = lazy(() =>
 const OrganisationsPage = lazy(() =>
   import('@/pages/OrganisationsPage').then((m) => ({ default: m.OrganisationsPage })),
 )
+const MergeLogPage = lazy(() => import('@/pages/MergeLogPage').then((m) => ({ default: m.MergeLogPage })))
 const OrganisationDetailPage = lazy(() =>
   import('@/pages/OrganisationDetailPage').then((m) => ({ default: m.OrganisationDetailPage })),
 )
@@ -41,6 +42,7 @@ export default function App() {
           <Route path="contacts/:contactId" element={<ContactDetailPage />} />
           <Route path="organisations" element={<OrganisationsPage />} />
           <Route path="organisations/:id" element={<OrganisationDetailPage />} />
+          <Route path="merges" element={<MergeLogPage />} />
         </Route>
       </Route>
     </Routes>
