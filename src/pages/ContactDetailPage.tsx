@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/EmptyState'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { DealsByStage } from '@/components/DealsByStage'
 import { ActivityTimeline } from '@/components/ActivityTimeline'
-import { BackLink, MetaRow, SaveBar, useBackTarget } from '@/components/RecordPage'
+import { BackLink, MetaRow, SaveBar, useBackTarget, type BackTarget } from '@/components/RecordPage'
 import { ContactFields } from '@/components/contacts/ContactFields'
 import {
   contactFormValues,
@@ -144,6 +144,8 @@ export function ContactDetailPage() {
     )
   }
 
+  const here: BackTarget = { to: `/contacts/${contact.id}`, label: fullName(contact.first_name, contact.last_name) }
+
   return (
     <div className="p-8 pb-0">
       <div className="max-w-5xl">
@@ -208,7 +210,7 @@ export function ContactDetailPage() {
             <section>
               <h2 className="text-sm font-semibold tracking-tight">Deals</h2>
               <div className="mt-3">
-                <DealsByStage deals={deals} />
+                <DealsByStage deals={deals} backTarget={here} />
               </div>
             </section>
           </aside>

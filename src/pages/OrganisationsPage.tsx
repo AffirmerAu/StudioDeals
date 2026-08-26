@@ -18,6 +18,8 @@ import { Pagination } from '@/components/Pagination'
 import { SortableHeader, type SortState } from '@/components/SortableHeader'
 import { OrganisationFormModal } from '@/components/organisations/OrganisationFormModal'
 
+const BACK_TO_ORGANISATIONS = { to: '/organisations', label: 'Organisations' }
+
 export function OrganisationsPage() {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
@@ -165,7 +167,7 @@ export function OrganisationsPage() {
               rows.map((org) => (
                 <tr
                   key={org.id}
-                  onClick={() => navigate(`/organisations/${org.id}`)}
+                  onClick={() => navigate(`/organisations/${org.id}`, { state: { from: BACK_TO_ORGANISATIONS } })}
                   className="cursor-pointer border-b transition-colors duration-150 last:border-b-0"
                   style={{ borderColor: 'var(--border)' }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--surface-hover)')}
@@ -210,12 +212,10 @@ export function OrganisationsPage() {
 
       <OrganisationFormModal
         open={addOpen}
-        organisation={null}
         onClose={() => setAddOpen(false)}
-        onSaved={() => {
+        onCreated={(created) => {
           setAddOpen(false)
-          setPage(0)
-          setRefreshKey((k) => k + 1)
+          navigate(`/organisations/${created.id}`, { state: { from: BACK_TO_ORGANISATIONS } })
         }}
       />
     </div>
