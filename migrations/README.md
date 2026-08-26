@@ -34,8 +34,14 @@ Keeping these files honest
 --------------------------
 003 was originally written as a proposal and the views were then built
 differently by hand, so for a long time it did not describe what was live.
-It has been corrected against src/types/database.ts, which is the real
-introspected shape of the live views.
+It has since been reconciled against the live definitions.
+
+Reconciling it turned up a bug: the live v_organisation_summary joined
+contacts and deals flat off the same organisation, so each deal's value was
+summed once per contact and won_value_cents — shown and sortable on the
+organisations list — was multiplied by the contact count. 003 now aggregates
+each side separately, and re-running it replaces the view in place and
+corrects the figures.
 
 The same can happen again. After applying anything that adds or alters a
 table, view or function, regenerate the types — both so the app can stop
@@ -43,3 +49,14 @@ casting around the change, and so there is a checkable record of what is
 actually live:
 
     supabase gen types typescript --schema crm > src/types/database.ts
+
+But do not trust the generated types for a view's column ORDER or for the
+width of a numeric column: they are alphabetised, and bigint and numeric both
+come back as `number`. `create or replace view` matches columns by position
+and type, so getting either wrong fails with "cannot change name of view
+column". The live shape comes from the database itself:
+
+    select ordinal_position, column_name, data_type
+    from information_schema.columns
+    where table_schema = 'crm' and table_name = 'v_contacts_list'
+    order by ordinal_position;
