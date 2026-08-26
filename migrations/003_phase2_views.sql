@@ -2,11 +2,28 @@
 -- StudioDeals — Phase 2 (organisations & contacts) support views
 -- Run in the SQL Editor of the StudioDeals Supabase project, after 001 and 002.
 -- ============================================================================
+--
+-- ⚠️ This file was originally written as a proposal and the views were then
+-- built differently by hand, so for a long time it did not describe what was
+-- actually live. It has since been corrected against the generated types in
+-- src/types/database.ts, which are the real introspected shape of the live
+-- views. The column sets now match exactly.
+--
+-- Two things that catch people out on these views:
+--
+--   * neither carries updated_at, though an earlier version of this file
+--     selected it. Code that needs a contact's updated_at has to read
+--     crm.contacts, which is why ContactEditableFields is a Pick rather than
+--     the whole row;
+--   * every column comes back nullable from `supabase gen types`, whatever
+--     the underlying constraints — Postgres view introspection does not
+--     propagate NOT NULL and there is no SQL fix. types/crm.ts narrows the
+--     handful that the view definitions themselves prove non-null.
 
 -- ---------- Organisation list aggregates ----------
--- Powers the organisations list page: contact count, open deal count, and
--- total won value per organisation, computed server-side so the list page
--- can page/sort/filter without pulling all 603 rows or issuing N+1 queries.
+-- Powers the organisations list page: per-organisation counts and values,
+-- computed server-side so the list can page/sort/filter without pulling all
+-- 603 rows or issuing N+1 queries.
 create or replace view crm.v_organisation_summary as
 select
   o.id,
@@ -19,13 +36,20 @@ select
   o.is_client,
   o.notes,
   o.created_at,
-  o.updated_at,
   coalesce(c.contact_count, 0)    as contact_count,
+  c.last_contacted_at,
+  coalesce(d.deal_count, 0)       as deal_count,
   coalesce(d.open_deal_count, 0)  as open_deal_count,
+  coalesce(d.open_value_cents, 0) as open_value_cents,
   coalesce(d.won_value_cents, 0)  as won_value_cents
 from crm.organisations o
 left join (
-  select organisation_id, count(*) as contact_count
+  select
+    organisation_id,
+    count(*)               as contact_count,
+    -- The organisation is as recently contacted as its most recently
+    -- contacted person.
+    max(last_contacted_at) as last_contacted_at
   from crm.contacts
   where organisation_id is not null
   group by organisation_id
@@ -33,17 +57,23 @@ left join (
 left join (
   select
     d.organisation_id,
-    count(*) filter (where s.is_won = false and s.is_lost = false) as open_deal_count,
-    sum(d.value_cents) filter (where s.is_won = true)               as won_value_cents
+    count(*)                                                                as deal_count,
+    count(*) filter (where not s.is_won and not s.is_lost)                  as open_deal_count,
+    -- Open value, not total: won and lost only accumulate, so a running
+    -- total of everything says nothing about the account today. Matches the
+    -- "Open pipeline value" the dashboard reports.
+    coalesce(sum(d.value_cents) filter (where not s.is_won and not s.is_lost), 0)
+                                                                            as open_value_cents,
+    coalesce(sum(d.value_cents) filter (where s.is_won), 0)                 as won_value_cents
   from crm.deals d
   join crm.pipeline_stages s on s.id = d.stage_id
   group by d.organisation_id
 ) d on d.organisation_id = o.id;
 
 -- ---------- Contacts list ----------
--- Flattens organisation name onto the contact row (so search/sort/pagination
--- don't need resource embedding) and reuses crm.v_stale_contacts to flag
--- contacts who haven't been contacted in 60+ days.
+-- Flattens the organisation's name, industry and client flag onto the contact
+-- row, so search/sort/pagination don't need resource embedding, and reuses
+-- crm.v_stale_contacts to flag anyone not contacted in 60+ days.
 create or replace view crm.v_contacts_list as
 select
   c.id,
@@ -57,8 +87,11 @@ select
   c.last_contacted_at,
   c.notes,
   c.created_at,
-  c.updated_at,
-  o.name as organisation_name,
+  o.name     as organisation_name,
+  o.industry as organisation_industry,
+  o.is_client,
+  -- A boolean expression, so unlike every other column here it is genuinely
+  -- never null — types/crm.ts narrows it on that basis.
   (v.id is not null) as is_stale
 from crm.contacts c
 left join crm.organisations o     on o.id = c.organisation_id
