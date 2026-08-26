@@ -5,9 +5,13 @@
 --
 -- ⚠️ This file was originally written as a proposal and the views were then
 -- built differently by hand, so for a long time it did not describe what was
--- actually live. It has since been corrected against the generated types in
--- src/types/database.ts, which are the real introspected shape of the live
--- views. The column sets now match exactly.
+-- actually live. It has since been reconciled against the live definitions.
+-- Column names, types and order match exactly, so both statements replace the
+-- live views in place.
+--
+-- v_organisation_summary is the one deliberate departure: the live definition
+-- double-counted deal values, and the note on it below explains what changed
+-- and why.
 --
 -- Two things that catch people out on these views:
 --
@@ -24,6 +28,26 @@
 -- Powers the organisations list page: per-organisation counts and values,
 -- computed server-side so the list can page/sort/filter without pulling all
 -- 603 rows or issuing N+1 queries.
+--
+-- ⚠️ This is NOT a verbatim copy of what was live. The live definition joined
+-- contacts and deals flat off the same organisation:
+--
+--     from crm.organisations o
+--     left join crm.contacts c on c.organisation_id = o.id
+--     left join crm.deals    d on d.organisation_id = o.id
+--
+-- which is a cartesian product — an organisation with 3 contacts and 2 deals
+-- produces 6 rows. The counts survived that, because they were written as
+-- count(distinct ...), but the two sums were not, so every deal's value was
+-- counted once per contact. Three organisations holding identical deals
+-- reported $10,000, $10,000 and $30,000 of won value depending only on how
+-- many people were attached to them. won_value_cents is shown and sortable on
+-- the organisations list, so the numbers on that page were wrong.
+--
+-- Aggregating each side separately before joining is what fixes it: the
+-- subqueries below produce at most one row per organisation each, so there is
+-- nothing to multiply. Column names, types and order are unchanged from the
+-- live view, so this replaces it in place.
 create or replace view crm.v_organisation_summary as
 select
   o.id,
@@ -37,11 +61,11 @@ select
   o.notes,
   o.created_at,
   coalesce(c.contact_count, 0)    as contact_count,
-  c.last_contacted_at,
   coalesce(d.deal_count, 0)       as deal_count,
   coalesce(d.open_deal_count, 0)  as open_deal_count,
   coalesce(d.open_value_cents, 0) as open_value_cents,
-  coalesce(d.won_value_cents, 0)  as won_value_cents
+  coalesce(d.won_value_cents, 0)  as won_value_cents,
+  c.last_contacted_at
 from crm.organisations o
 left join (
   select
@@ -57,14 +81,15 @@ left join (
 left join (
   select
     d.organisation_id,
-    count(*)                                                                as deal_count,
-    count(*) filter (where not s.is_won and not s.is_lost)                  as open_deal_count,
-    -- Open value, not total: won and lost only accumulate, so a running
-    -- total of everything says nothing about the account today. Matches the
-    -- "Open pipeline value" the dashboard reports.
-    coalesce(sum(d.value_cents) filter (where not s.is_won and not s.is_lost), 0)
-                                                                            as open_value_cents,
-    coalesce(sum(d.value_cents) filter (where s.is_won), 0)                 as won_value_cents
+    count(*)                                               as deal_count,
+    count(*) filter (where not s.is_won and not s.is_lost) as open_deal_count,
+    -- Open value, not total: won and lost only accumulate, so a running total
+    -- of everything says nothing about the account today. Matches the "Open
+    -- pipeline value" the dashboard reports.
+    coalesce(sum(d.value_cents) filter (where not s.is_won and not s.is_lost), 0)::bigint
+                                                           as open_value_cents,
+    coalesce(sum(d.value_cents) filter (where s.is_won), 0)::bigint
+                                                           as won_value_cents
   from crm.deals d
   join crm.pipeline_stages s on s.id = d.stage_id
   group by d.organisation_id

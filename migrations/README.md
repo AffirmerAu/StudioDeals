@@ -34,8 +34,14 @@ Keeping these files honest
 --------------------------
 003 was originally written as a proposal and the views were then built
 differently by hand, so for a long time it did not describe what was live.
-It has been corrected against src/types/database.ts, which is the real
-introspected shape of the live views.
+It has since been reconciled against the live definitions.
+
+Reconciling it turned up a bug: the live v_organisation_summary joined
+contacts and deals flat off the same organisation, so each deal's value was
+summed once per contact and won_value_cents — shown and sortable on the
+organisations list — was multiplied by the contact count. 003 now aggregates
+each side separately, and re-running it replaces the view in place and
+corrects the figures.
 
 The same can happen again. After applying anything that adds or alters a
 table, view or function, regenerate the types — both so the app can stop
