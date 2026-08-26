@@ -9,6 +9,7 @@ Numbered migrations, applied by pasting into the Supabase SQL Editor.
                                 RLS policy
 007_merge_contacts.sql        — v_possible_duplicate_contacts,
                                 crm.merge_contacts, v_merge_log
+008_tag_labels_ci.sql         — case-insensitive uniqueness on tag labels
 
 002 was the Capsule import (staging tables and merge, Phase 0.5). It was
 applied to the live database but the file was never committed here, so a
