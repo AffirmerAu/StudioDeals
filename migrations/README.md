@@ -49,3 +49,14 @@ casting around the change, and so there is a checkable record of what is
 actually live:
 
     supabase gen types typescript --schema crm > src/types/database.ts
+
+But do not trust the generated types for a view's column ORDER or for the
+width of a numeric column: they are alphabetised, and bigint and numeric both
+come back as `number`. `create or replace view` matches columns by position
+and type, so getting either wrong fails with "cannot change name of view
+column". The live shape comes from the database itself:
+
+    select ordinal_position, column_name, data_type
+    from information_schema.columns
+    where table_schema = 'crm' and table_name = 'v_contacts_list'
+    order by ordinal_position;

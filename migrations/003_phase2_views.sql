@@ -99,24 +99,32 @@ left join (
 -- Flattens the organisation's name, industry and client flag onto the contact
 -- row, so search/sort/pagination don't need resource embedding, and reuses
 -- crm.v_stale_contacts to flag anyone not contacted in 60+ days.
+--
+-- The column order below is the live one and is not the order of the columns
+-- on crm.contacts — is_primary and organisation_id sit near the end. It has to
+-- be preserved exactly: `create or replace view` matches columns by position,
+-- so reordering them fails with "cannot change name of view column". The
+-- generated types cannot help here, since they are alphabetised.
 create or replace view crm.v_contacts_list as
 select
   c.id,
-  c.organisation_id,
   c.first_name,
   c.last_name,
   c.role,
   c.email,
   c.phone,
-  c.is_primary,
   c.last_contacted_at,
   c.notes,
+  c.is_primary,
+  c.organisation_id,
   c.created_at,
   o.name     as organisation_name,
   o.industry as organisation_industry,
   o.is_client,
   -- A boolean expression, so unlike every other column here it is genuinely
-  -- never null — types/crm.ts narrows it on that basis.
+  -- never null — types/crm.ts narrows it on that basis. v_stale_contacts
+  -- yields at most one row per contact (it selects from crm.contacts and
+  -- joins organisations on a primary key), so this join cannot duplicate.
   (v.id is not null) as is_stale
 from crm.contacts c
 left join crm.organisations o     on o.id = c.organisation_id
