@@ -9,9 +9,10 @@ import {
 import type { OrganisationSummaryRow } from '@/types/crm'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 import { formatCents } from '@/lib/format'
-import { listDuplicateOrgPairs, type DuplicateOrgPair } from '@/lib/duplicates'
+import { listDuplicateOrgPairs, mergeOrganisations, type DuplicateOrgPair } from '@/lib/duplicates'
 import { CompanyLogo } from '@/components/CompanyLogo'
-import { DuplicatesModal } from '@/components/organisations/DuplicatesModal'
+import { DuplicatesModal, type DuplicateCandidate } from '@/components/merge/DuplicatesModal'
+import { DuplicatesBar } from '@/components/merge/DuplicatesBar'
 import { EmptyState } from '@/components/EmptyState'
 import { SkeletonTableRows } from '@/components/Skeleton'
 import { Pagination } from '@/components/Pagination'
@@ -19,6 +20,17 @@ import { SortableHeader, type SortState } from '@/components/SortableHeader'
 import { OrganisationFormModal } from '@/components/organisations/OrganisationFormModal'
 
 const BACK_TO_ORGANISATIONS = { to: '/organisations', label: 'Organisations' }
+
+function toCandidate(pair: DuplicateOrgPair): DuplicateCandidate {
+  return {
+    key: `${pair.idA}-${pair.idB}`,
+    idA: pair.idA,
+    nameA: pair.nameA,
+    idB: pair.idB,
+    nameB: pair.nameB,
+    reason: `${Math.round(pair.score * 100)}% similar`,
+  }
+}
 
 export function OrganisationsPage() {
   const navigate = useNavigate()
@@ -87,16 +99,12 @@ export function OrganisationsPage() {
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-xl font-semibold tracking-tight">Organisations</h1>
         <div className="flex items-center gap-2">
-          {duplicates.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setDuplicatesOpen(true)}
-              className="rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors duration-150"
-              style={{ borderColor: 'var(--color-stage-verbal)', color: 'var(--color-stage-verbal)' }}
-            >
-              {duplicates.length} possible {duplicates.length === 1 ? 'duplicate' : 'duplicates'}
-            </button>
-          )}
+          <DuplicatesBar
+            count={duplicates.length}
+            noun="duplicate"
+            onOpen={() => setDuplicatesOpen(true)}
+            from={BACK_TO_ORGANISATIONS}
+          />
         <button
           type="button"
           onClick={() => setAddOpen(true)}
@@ -200,12 +208,15 @@ export function OrganisationsPage() {
 
       <DuplicatesModal
         open={duplicatesOpen}
-        pairs={duplicates}
+        title="Possible duplicates"
+        entityLabel="organisation"
+        movesAcross="contacts, deals, activities and tags"
+        candidates={duplicates.map(toCandidate)}
+        merge={mergeOrganisations}
         onClose={() => setDuplicatesOpen(false)}
-        onMerged={(pair) => {
-          setDuplicates((current) => current.filter((p) => !(p.idA === pair.idA && p.idB === pair.idB)))
+        onMerged={() => {
           // The merged organisation is gone and the survivor's counts have
-          // moved, so the table behind the modal is stale.
+          // moved, so both the pair list and the table behind it are stale.
           setRefreshKey((k) => k + 1)
         }}
       />

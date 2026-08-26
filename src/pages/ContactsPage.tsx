@@ -15,9 +15,28 @@ import { Pagination } from '@/components/Pagination'
 import { SortableHeader, type SortState } from '@/components/SortableHeader'
 import { Combobox } from '@/components/Combobox'
 import { ContactFormModal } from '@/components/contacts/ContactFormModal'
+import { DuplicatesModal, type DuplicateCandidate } from '@/components/merge/DuplicatesModal'
+import { DuplicatesBar } from '@/components/merge/DuplicatesBar'
+import { listDuplicateContactPairs, mergeContacts, type DuplicateContactPair } from '@/lib/duplicates'
 import type { ContactListRow } from '@/types/crm'
 
 const BACK_TO_CONTACTS = { to: '/contacts', label: 'Contacts' }
+
+function toCandidate(pair: DuplicateContactPair): DuplicateCandidate {
+  return {
+    key: `${pair.idA}-${pair.idB}`,
+    idA: pair.idA,
+    nameA: pair.nameA,
+    idB: pair.idB,
+    nameB: pair.nameB,
+    detailA: pair.emailA,
+    detailB: pair.emailB,
+    // An email match is exact, so a percentage would be noise; a name match
+    // only ever surfaces within one organisation, which is worth naming.
+    reason: pair.matchOn === 'email' ? 'Same email' : `${Math.round(pair.score * 100)}% similar`,
+    context: pair.matchOn === 'name' ? pair.organisationName : null,
+  }
+}
 
 export function ContactsPage() {
   const navigate = useNavigate()
@@ -34,6 +53,15 @@ export function ContactsPage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
+  const [duplicates, setDuplicates] = useState<DuplicateContactPair[]>([])
+  const [duplicatesOpen, setDuplicatesOpen] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  // Fails soft: duplicate detection is a nicety, and before migration 007 the
+  // view isn't there to consult nor the function there to act on it.
+  useEffect(() => {
+    listDuplicateContactPairs().then(setDuplicates).catch(() => setDuplicates([]))
+  }, [refreshKey])
 
   useEffect(() => {
     setPage(0)
@@ -61,7 +89,7 @@ export function ContactsPage() {
     return () => {
       cancelled = true
     }
-  }, [debouncedSearch, organisation, tagId, sort, page])
+  }, [debouncedSearch, organisation, tagId, sort, page, refreshKey])
 
   const handleSort = (column: ContactSortColumn) => {
     setSort((current) =>
@@ -73,14 +101,22 @@ export function ContactsPage() {
     <div className="p-8">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-xl font-semibold tracking-tight">Contacts</h1>
-        <button
-          type="button"
-          onClick={() => setAddOpen(true)}
-          className="rounded-lg px-3 py-1.5 text-sm font-medium text-white transition-colors duration-150"
-          style={{ background: 'var(--color-brand-500)' }}
-        >
-          New contact
-        </button>
+        <div className="flex items-center gap-2">
+          <DuplicatesBar
+            count={duplicates.length}
+            noun="duplicate"
+            onOpen={() => setDuplicatesOpen(true)}
+            from={BACK_TO_CONTACTS}
+          />
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            className="rounded-lg px-3 py-1.5 text-sm font-medium text-white transition-colors duration-150"
+            style={{ background: 'var(--color-brand-500)' }}
+          >
+            New contact
+          </button>
+        </div>
       </div>
 
       <div className="mt-5 flex flex-wrap items-start gap-3">
@@ -183,6 +219,17 @@ export function ContactsPage() {
       {!loading && rows.length > 0 && (
         <Pagination page={page} pageSize={CONTACTS_PAGE_SIZE} total={total} onPageChange={setPage} />
       )}
+
+      <DuplicatesModal
+        open={duplicatesOpen}
+        title="Possible duplicate contacts"
+        entityLabel="contact"
+        movesAcross="deals, activities and tags"
+        candidates={duplicates.map(toCandidate)}
+        merge={mergeContacts}
+        onClose={() => setDuplicatesOpen(false)}
+        onMerged={() => setRefreshKey((k) => k + 1)}
+      />
 
       <ContactFormModal
         open={addOpen}
