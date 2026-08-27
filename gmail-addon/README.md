@@ -178,17 +178,19 @@ indistinguishable on `/tasks`. Tasks are excluded from
 `crm.recompute_last_contacted`, so setting a follow-up does not mark a client
 as recently contacted.
 
-**The date-time picker reports instants, not wall-clock times.** This was
-first built the other way, subtracting `commonEventObject.timeZone.offset` on
-the theory that the widget was timezone-naive, and a task left on the default
-1:00 pm came back due at 3:00 am — exactly the ten hours Sydney is ahead of
-UTC in August.
+**The date-time picker reports a clock face, not an instant.** Picking 5pm on
+30 August 2026 in Sydney returns `1788109200000`, which is
+`2026-08-30T17:00:00Z` — ten hours ahead of the moment that wall clock actually
+names. So `pickerWallClock` reads the face, and `dueAtFromPicker` resolves it
+with `Utilities.parseDate` inside the viewer's timezone.
 
-The evidence was in the code the whole time: the default is set with
-`setValueInMsSinceEpoch(Date.now() + n days)`, a genuine epoch instant, and the
-picker showed it at the right wall-clock time. A widget whose value space is
-instants on the way in reports instants on the way out. When a read and a write
-touch the same value, check they agree before reaching for a correction.
+`parseDate` rather than subtracting `commonEventObject.timeZone.offset`,
+because that offset is the one in force *today*: a task set in September for a
+date in November would have been an hour out once Sydney moved to daylight
+time, and nothing would have said so.
 
-The card that follows still shows the time it settled on, which is how this was
-caught and how the next surprise will be.
+This took three attempts — subtract, don't subtract, then finally look at the
+number — and the lesson is cheaper than the detour was. The confirmation card
+carries `Picked (raw ms)` under `CONFIG.DEBUG` for exactly this reason. When a
+value is arriving from a platform you cannot test against, print it before
+theorising about it.

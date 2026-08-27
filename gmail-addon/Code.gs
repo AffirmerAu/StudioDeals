@@ -226,11 +226,16 @@ var DEFAULT_DUE_DAYS = 3;
 function dueAtValue(event) {
   var common = event && event.commonEventObject;
 
+  // The zone the person is standing in, which is the one the clock face they
+  // just read belongs to. The script's own zone stands in if the event is
+  // quiet about it.
+  var zone = (common && common.timeZone && common.timeZone.id) || null;
+
   if (common && common.formInputs && common.formInputs.dueAt) {
     var picked = common.formInputs.dueAt.dateTimeInput;
     if (picked && picked.msSinceEpoch != null) {
       return {
-        iso: dueAtFromPicker(picked.msSinceEpoch),
+        iso: dueAtFromPicker(picked.msSinceEpoch, zone),
         raw: String(picked.msSinceEpoch),
         source: 'commonEventObject' + (picked.hasTime === false ? ' (date only)' : ''),
       };
@@ -238,7 +243,7 @@ function dueAtValue(event) {
   }
   if (event && event.formInput && event.formInput.dueAt != null) {
     return {
-      iso: dueAtFromPicker(event.formInput.dueAt),
+      iso: dueAtFromPicker(event.formInput.dueAt, zone),
       raw: String(event.formInput.dueAt),
       source: 'formInput (legacy)',
     };

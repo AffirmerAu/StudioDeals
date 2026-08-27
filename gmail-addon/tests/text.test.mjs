@@ -18,8 +18,8 @@ const T = new Function(
     ' pickCounterparty, displayNameFor, describeLastContacted, truncate,' +
     ' formatCents, isQuoteBoundary, cleanBody, buildNote, describeFiling, activityRow,' +
     ' activitiesInThreadPath, openDealsPath, contactPath, stagesPath, urlSafe,' +
-    ' isDuplicateError, emailDomain, splitDisplayName, organisationNameFromDomain,' +
-    ' contactsByDomainPath, organisationsPath, dueAtFromPicker, contactRow, taskRow };',
+    ' isDuplicateError, pickerWallClock, emailDomain, splitDisplayName, organisationNameFromDomain,' +
+    ' contactsByDomainPath, organisationsPath, contactRow, taskRow };',
 )()
 
 let passed = 0
@@ -325,20 +325,22 @@ is('it only asks for contacts that have an organisation',
 is('the organisations list is ordered by name',
   T.organisationsPath().includes('order=name'), true)
 
-// ---------- the picker's value ----------
-// Measured, not reasoned about: a task left on the default 1:00 pm came back
-// saying 3:00 am, exactly the ten hours Sydney is ahead of UTC in August. The
-// widget reports instants, so reading one is the identity.
-const ONE_PM_SYDNEY = Date.parse('2026-08-29T13:00:00+10:00')
-is('an instant survives the round trip',
-  T.dueAtFromPicker(ONE_PM_SYDNEY), '2026-08-29T03:00:00.000Z')
-is('symmetric with what the card sets as its default',
-  T.dueAtFromPicker(Date.parse('2026-08-30T09:15:00Z')), '2026-08-30T09:15:00.000Z')
-is('nothing picked is null', T.dueAtFromPicker(null), null)
-is('an empty string is null, not 1970', T.dueAtFromPicker(''), null)
-is('undefined is null too', T.dueAtFromPicker(undefined), null)
-is('rubbish is null', T.dueAtFromPicker('later'), null)
-is('zero is not a date somebody picked', T.dueAtFromPicker(0), '1970-01-01T00:00:00.000Z')
+// ---------- what the picker actually reports ----------
+// The anchor for all of this is one measurement, not an argument: picking
+// 5pm on 30 August 2026 in Sydney returned 1788109200000.
+is('the measured value reads back as the clock face that was picked',
+  T.pickerWallClock(1788109200000), '2026-08-30T17:00:00')
+is('which is ten hours off the instant it names, hence the parse in-zone',
+  (1788109200000 - Date.parse('2026-08-30T17:00:00+10:00')) / 3600000, 10)
+
+is('midnight keeps its zeroes', T.pickerWallClock(Date.UTC(2026, 7, 30, 0, 0)), '2026-08-30T00:00:00')
+is('single digits are padded', T.pickerWallClock(Date.UTC(2026, 0, 5, 9, 7, 3)), '2026-01-05T09:07:03')
+is('the last minute of a year', T.pickerWallClock(Date.UTC(2026, 11, 31, 23, 59)), '2026-12-31T23:59:00')
+is('nothing picked is null', T.pickerWallClock(null), null)
+is('an empty string is null, not 1970', T.pickerWallClock(''), null)
+is('undefined is null too', T.pickerWallClock(undefined), null)
+is('rubbish is null', T.pickerWallClock('later'), null)
+is('the epoch itself still reads', T.pickerWallClock(0), '1970-01-01T00:00:00')
 
 // ---------- the rows ----------
 const newContact = T.contactRow({
