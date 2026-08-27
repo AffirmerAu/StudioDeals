@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.17"
   }
   crm: {
     Tables: {
@@ -71,6 +71,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_contacts_list"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "activities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_contacts"
+            referencedColumns: ["id_a"]
+          },
+          {
+            foreignKeyName: "activities_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_contacts"
+            referencedColumns: ["id_b"]
           },
           {
             foreignKeyName: "activities_contact_id_fkey"
@@ -138,6 +152,7 @@ export type Database = {
           id: string
           is_primary: boolean
           last_contacted_at: string | null
+          last_contacted_baseline: string | null
           last_name: string | null
           legacy_capsule_id: string | null
           notes: string | null
@@ -153,6 +168,7 @@ export type Database = {
           id?: string
           is_primary?: boolean
           last_contacted_at?: string | null
+          last_contacted_baseline?: string | null
           last_name?: string | null
           legacy_capsule_id?: string | null
           notes?: string | null
@@ -168,6 +184,7 @@ export type Database = {
           id?: string
           is_primary?: boolean
           last_contacted_at?: string | null
+          last_contacted_baseline?: string | null
           last_name?: string | null
           legacy_capsule_id?: string | null
           notes?: string | null
@@ -215,6 +232,7 @@ export type Database = {
           deal_type: string
           expected_close_date: string | null
           handed_off_at: string | null
+          handoff_key: string | null
           id: string
           legacy_capsule_id: string | null
           lost_at: string | null
@@ -238,6 +256,7 @@ export type Database = {
           deal_type?: string
           expected_close_date?: string | null
           handed_off_at?: string | null
+          handoff_key?: string | null
           id?: string
           legacy_capsule_id?: string | null
           lost_at?: string | null
@@ -261,6 +280,7 @@ export type Database = {
           deal_type?: string
           expected_close_date?: string | null
           handed_off_at?: string | null
+          handoff_key?: string | null
           id?: string
           legacy_capsule_id?: string | null
           lost_at?: string | null
@@ -319,6 +339,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "v_contacts_list"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deals_primary_contact_id_fkey"
+            columns: ["primary_contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_contacts"
+            referencedColumns: ["id_a"]
+          },
+          {
+            foreignKeyName: "deals_primary_contact_id_fkey"
+            columns: ["primary_contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_contacts"
+            referencedColumns: ["id_b"]
           },
           {
             foreignKeyName: "deals_primary_contact_id_fkey"
@@ -479,6 +513,20 @@ export type Database = {
             foreignKeyName: "taggings_contact_id_fkey"
             columns: ["contact_id"]
             isOneToOne: false
+            referencedRelation: "v_possible_duplicate_contacts"
+            referencedColumns: ["id_a"]
+          },
+          {
+            foreignKeyName: "taggings_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "v_possible_duplicate_contacts"
+            referencedColumns: ["id_b"]
+          },
+          {
+            foreignKeyName: "taggings_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
             referencedRelation: "v_stale_contacts"
             referencedColumns: ["id"]
           },
@@ -534,6 +582,30 @@ export type Database = {
           id?: number
           kind?: string
           label?: string
+        }
+        Relationships: []
+      }
+      targets: {
+        Row: {
+          id: number
+          new_deals_per_month: number
+          updated_at: string
+          won_deals_per_month: number
+          won_value_cents_per_month: number
+        }
+        Insert: {
+          id?: number
+          new_deals_per_month?: number
+          updated_at?: string
+          won_deals_per_month?: number
+          won_value_cents_per_month?: number
+        }
+        Update: {
+          id?: number
+          new_deals_per_month?: number
+          updated_at?: string
+          won_deals_per_month?: number
+          won_value_cents_per_month?: number
         }
         Relationships: []
       }
@@ -600,6 +672,20 @@ export type Database = {
         }
         Relationships: []
       }
+      v_merge_log: {
+        Row: {
+          entity_type: string | null
+          id: string | null
+          merged_at: string | null
+          merged_by: string | null
+          merged_id: string | null
+          merged_name: string | null
+          merged_snapshot: Json | null
+          survivor_id: string | null
+          survivor_name: string | null
+        }
+        Relationships: []
+      }
       v_organisation_summary: {
         Row: {
           abn: string | null
@@ -637,6 +723,20 @@ export type Database = {
           forecast_month: string | null
           gross_value_cents: number | null
           weighted_value_cents: number | null
+        }
+        Relationships: []
+      }
+      v_possible_duplicate_contacts: {
+        Row: {
+          email_a: string | null
+          email_b: string | null
+          id_a: string | null
+          id_b: string | null
+          match_on: string | null
+          name_a: string | null
+          name_b: string | null
+          organisation_name: string | null
+          score: number | null
         }
         Relationships: []
       }
@@ -701,7 +801,15 @@ export type Database = {
       }
     }
     Functions: {
-      [_ in never]: never
+      merge_contacts: {
+        Args: { loser: string; survivor: string }
+        Returns: undefined
+      }
+      merge_organisations: {
+        Args: { loser: string; survivor: string }
+        Returns: undefined
+      }
+      recompute_last_contacted: { Args: { target: string }; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
