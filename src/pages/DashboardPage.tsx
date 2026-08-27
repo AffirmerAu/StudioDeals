@@ -11,7 +11,7 @@ import {
   type StageValueTotal,
 } from '@/lib/dashboard'
 import { markDealHandedOff } from '@/lib/deals'
-import { listOpenFollowUps, setActivityCompleted, type OpenFollowUpRow } from '@/lib/activities'
+import { isOverdue, listOpenFollowUps, setActivityCompleted, type OpenFollowUpRow } from '@/lib/activities'
 import { fetchTargets, NO_TARGETS, type TargetValues } from '@/lib/targets'
 import { FollowUpsList } from '@/components/FollowUpsList'
 import { TargetTile } from '@/components/TargetTile'
@@ -50,6 +50,7 @@ export function DashboardPage() {
   const [pendingHandoff, setPendingHandoff] = useState<PendingHandoffRow[]>([])
   const [wonThisMonth, setWonThisMonth] = useState({ count: 0, valueCents: 0 })
   const [openFollowUps, setOpenFollowUps] = useState<OpenFollowUpRow[]>([])
+  const [followUpTotal, setFollowUpTotal] = useState(0)
   const [followUpBusyId, setFollowUpBusyId] = useState<string | null>(null)
   const [newDealsThisMonth, setNewDealsThisMonth] = useState(0)
   const [targets, setTargets] = useState<TargetValues>(NO_TARGETS)
@@ -80,7 +81,8 @@ export function DashboardPage() {
         setNeedsAttention(attention)
         setPendingHandoff(handoff)
         setWonThisMonth(won)
-        setOpenFollowUps(followUps)
+        setOpenFollowUps(followUps.rows)
+        setFollowUpTotal(followUps.total)
         setNewDealsThisMonth(newDeals)
         setTargets(targetValues)
       })
@@ -96,15 +98,19 @@ export function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stagesLoading])
 
+  const overdueCount = openFollowUps.filter((row) => isOverdue(row.due_at)).length
+
   // Drop it from the list straight away, restore it if the write fails.
   const handleCompleteFollowUp = async (row: OpenFollowUpRow) => {
     const previous = openFollowUps
     setFollowUpBusyId(row.id)
     setOpenFollowUps((current) => current.filter((r) => r.id !== row.id))
+    setFollowUpTotal((current) => Math.max(0, current - 1))
     try {
-      await setActivityCompleted(row.id, true)
+      await setActivityCompleted(row.id, true, row.type)
     } catch (error) {
       setOpenFollowUps(previous)
+      setFollowUpTotal((current) => current + 1)
       showToast(error instanceof Error ? error.message : 'Failed to update follow-up', 'error')
     } finally {
       setFollowUpBusyId(null)
@@ -206,10 +212,24 @@ export function DashboardPage() {
 
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', background: 'var(--surface-raised)' }}>
-          <h3 className="text-sm font-semibold tracking-tight">Follow-ups due</h3>
+          <div className="flex items-baseline justify-between gap-3">
+            <h3 className="text-sm font-semibold tracking-tight">Follow-ups due</h3>
+            {overdueCount > 0 && (
+              <span className="tabular text-xs font-medium" style={{ color: 'var(--color-stage-lost)' }}>
+                {overdueCount} overdue
+              </span>
+            )}
+          </div>
           <div className="mt-3">
             <FollowUpsList rows={openFollowUps} busyId={followUpBusyId} onComplete={handleCompleteFollowUp} />
           </div>
+          {/* The list is capped. Showing the first eight of thirty without
+              saying so is how a reminder quietly stops being one. */}
+          {followUpTotal > openFollowUps.length && (
+            <p className="mt-3 text-xs" style={{ color: 'var(--text-subtle)' }}>
+              Showing {openFollowUps.length} of {followUpTotal}. The rest are on their deals.
+            </p>
+          )}
         </div>
 
         <NeedsAttentionList rows={needsAttention} />

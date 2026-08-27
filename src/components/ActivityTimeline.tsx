@@ -69,7 +69,7 @@ export function ActivityTimeline({ organisationId, contactId, dealId, logDefault
       current.map((r) => (r.id === activity.id ? { ...r, completed_at: completing ? new Date().toISOString() : null } : r)),
     )
     try {
-      const saved = await setActivityCompleted(activity.id, completing)
+      const saved = await setActivityCompleted(activity.id, completing, activity.type)
       setRows((current) => current.map((r) => (r.id === saved.id ? saved : r)))
     } catch (error) {
       setRows((current) => current.map((r) => (r.id === activity.id ? activity : r)))

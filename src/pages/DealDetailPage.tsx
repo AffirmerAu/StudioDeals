@@ -19,6 +19,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { StageBadge } from '@/components/StageBadge'
 import { CompanyLogo } from '@/components/CompanyLogo'
 import { ActivityTimeline } from '@/components/ActivityTimeline'
+import { DealTasks } from '@/components/deals/DealTasks'
 import { BackLink, MetaRow, SaveBar, useBackTarget } from '@/components/RecordPage'
 import { DealFields } from '@/components/deals/DealFields'
 import { dealFormValues, toDealFormState, type DealFormState } from '@/components/deals/deal-form'
@@ -58,6 +59,7 @@ export function DealDetailPage() {
   const [deleteBusy, setDeleteBusy] = useState(false)
   const [handoffOpen, setHandoffOpen] = useState(false)
   const [handoffBusy, setHandoffBusy] = useState(false)
+  const [activityKey, setActivityKey] = useState(0)
 
   useEffect(() => {
     if (!dealId) return
@@ -228,7 +230,7 @@ export function DealDetailPage() {
           </button>
         </div>
 
-        <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <div className="mt-8 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
           <form onSubmit={handleSave} className="space-y-4">
             <h2 className="text-sm font-semibold tracking-tight">Details</h2>
             <DealFields
@@ -246,6 +248,15 @@ export function DealDetailPage() {
           </form>
 
           <aside className="space-y-6">
+            <DealTasks
+              dealId={deal.id}
+              organisationId={deal.organisation_id}
+              contactId={deal.primary_contact_id}
+              // A completed task drops into the history at its completion
+              // time, so the timeline has to reload to pick it up.
+              onCompleted={() => setActivityKey((k) => k + 1)}
+            />
+
             <section>
               <h2 className="text-sm font-semibold tracking-tight">Record</h2>
               {/* Only what the form beside it can't set — repeating an
@@ -286,6 +297,7 @@ export function DealDetailPage() {
           <h2 className="text-sm font-semibold tracking-tight">Activity</h2>
           <div className="mt-3">
             <ActivityTimeline
+              key={activityKey}
               dealId={deal.id}
               logDefaults={{
                 dealId: deal.id,
