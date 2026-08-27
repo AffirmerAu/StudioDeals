@@ -325,20 +325,20 @@ is('it only asks for contacts that have an organisation',
 is('the organisations list is ordered by name',
   T.organisationsPath().includes('order=name'), true)
 
-// ---------- the picker's timezone ----------
-// 5pm on 27 August 2026 in Sydney is 07:00 UTC. The picker reports the wall
-// time as though it were UTC, so the offset has to come back off.
-const SYDNEY_OFFSET = 10 * 3600000
-is('a Sydney afternoon lands at the right instant',
-  T.dueAtFromPicker(Date.UTC(2026, 7, 27, 17, 0), SYDNEY_OFFSET), '2026-08-27T07:00:00.000Z')
-is('no offset leaves the value alone',
-  T.dueAtFromPicker(Date.UTC(2026, 7, 27, 17, 0), 0), '2026-08-27T17:00:00.000Z')
-is('a missing offset is treated as zero',
-  T.dueAtFromPicker(Date.UTC(2026, 7, 27, 17, 0), undefined), '2026-08-27T17:00:00.000Z')
-is('nothing picked is null', T.dueAtFromPicker(null, SYDNEY_OFFSET), null)
-is('an empty string is null, not 1970', T.dueAtFromPicker('', SYDNEY_OFFSET), null)
-is('undefined is null too', T.dueAtFromPicker(undefined, SYDNEY_OFFSET), null)
-is('rubbish is null', T.dueAtFromPicker('later', SYDNEY_OFFSET), null)
+// ---------- the picker's value ----------
+// Measured, not reasoned about: a task left on the default 1:00 pm came back
+// saying 3:00 am, exactly the ten hours Sydney is ahead of UTC in August. The
+// widget reports instants, so reading one is the identity.
+const ONE_PM_SYDNEY = Date.parse('2026-08-29T13:00:00+10:00')
+is('an instant survives the round trip',
+  T.dueAtFromPicker(ONE_PM_SYDNEY), '2026-08-29T03:00:00.000Z')
+is('symmetric with what the card sets as its default',
+  T.dueAtFromPicker(Date.parse('2026-08-30T09:15:00Z')), '2026-08-30T09:15:00.000Z')
+is('nothing picked is null', T.dueAtFromPicker(null), null)
+is('an empty string is null, not 1970', T.dueAtFromPicker(''), null)
+is('undefined is null too', T.dueAtFromPicker(undefined), null)
+is('rubbish is null', T.dueAtFromPicker('later'), null)
+is('zero is not a date somebody picked', T.dueAtFromPicker(0), '1970-01-01T00:00:00.000Z')
 
 // ---------- the rows ----------
 const newContact = T.contactRow({

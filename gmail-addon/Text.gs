@@ -392,22 +392,27 @@ function organisationsPath() {
 
 
 /**
- * When the date-time picker's value has to be read as an instant.
+ * The date-time picker's value, as an instant.
  *
- * The picker hands back milliseconds since epoch that ignore the timezone the
- * person is standing in, and commonEventObject.timeZone.offset is what closes
- * the gap. Get the sign wrong and a task due at 5pm lands at 3am, so the card
- * that follows shows the time it settled on — the first task you set will say
- * whether this is right.
+ * This was first written to subtract commonEventObject.timeZone.offset, on the
+ * theory that the widget reports wall-clock time as though it were UTC. It
+ * does not, and the proof was already in this file's own caller: the default
+ * is set with setValueInMsSinceEpoch(Date.now() + n days) — a genuine epoch
+ * instant — and the picker showed it at the right wall-clock time. A widget
+ * whose value space is instants on the way in reports instants on the way out,
+ * and the read has to be symmetric with the write.
+ *
+ * The subtraction was also quietly wrong across a daylight-saving boundary: it
+ * used the offset in force today, not the one in force on the date picked.
  */
-function dueAtFromPicker(msSinceEpoch, offsetMs) {
+function dueAtFromPicker(msSinceEpoch) {
   // Not `Number(x)` on its own: Number(null) and Number('') are both 0, and a
   // task with no date picked would quietly land in January 1970.
   if (msSinceEpoch == null || msSinceEpoch === '') return null;
 
   var ms = Number(msSinceEpoch);
   if (!isFinite(ms)) return null;
-  return new Date(ms - Number(offsetMs || 0)).toISOString();
+  return new Date(ms).toISOString();
 }
 
 

@@ -178,9 +178,17 @@ indistinguishable on `/tasks`. Tasks are excluded from
 `crm.recompute_last_contacted`, so setting a follow-up does not mark a client
 as recently contacted.
 
-**One thing to check on first use.** The date-time picker returns milliseconds
-that ignore the timezone the person is standing in, and
-`commonEventObject.timeZone.offset` is what closes the gap. Which direction
-that correction runs could not be tested from the build side, so the card that
-follows shows the time it settled on. If a task set for 5pm comes back saying
-3am, the sign is wrong in `dueAtFromPicker` and it is a one-character fix.
+**The date-time picker reports instants, not wall-clock times.** This was
+first built the other way, subtracting `commonEventObject.timeZone.offset` on
+the theory that the widget was timezone-naive, and a task left on the default
+1:00 pm came back due at 3:00 am — exactly the ten hours Sydney is ahead of
+UTC in August.
+
+The evidence was in the code the whole time: the default is set with
+`setValueInMsSinceEpoch(Date.now() + n days)`, a genuine epoch instant, and the
+picker showed it at the right wall-clock time. A widget whose value space is
+instants on the way in reports instants on the way out. When a read and a write
+touch the same value, check they agree before reaching for a correction.
+
+The card that follows still shows the time it settled on, which is how this was
+caught and how the next surprise will be.

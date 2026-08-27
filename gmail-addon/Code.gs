@@ -214,24 +214,16 @@ var NEW_ORGANISATION = '__new__';
 var DEFAULT_DUE_DAYS = 3;
 
 
-/**
- * The date-time picker's value, in whichever shape the platform sends.
- *
- * Its milliseconds ignore the timezone the person is standing in;
- * dueAtFromPicker closes that gap with the offset the event carries.
- */
+/** The date-time picker's value, in whichever shape the platform sends. */
 function dueAtValue(event) {
   var common = event && event.commonEventObject;
-  var offset = (common && common.timeZone && common.timeZone.offset) || 0;
 
   if (common && common.formInputs && common.formInputs.dueAt) {
     var picked = common.formInputs.dueAt.dateTimeInput;
-    if (picked && picked.msSinceEpoch != null) {
-      return dueAtFromPicker(picked.msSinceEpoch, offset);
-    }
+    if (picked && picked.msSinceEpoch != null) return dueAtFromPicker(picked.msSinceEpoch);
   }
   if (event && event.formInput && event.formInput.dueAt != null) {
-    return dueAtFromPicker(event.formInput.dueAt, offset);
+    return dueAtFromPicker(event.formInput.dueAt);
   }
   return null;
 }
