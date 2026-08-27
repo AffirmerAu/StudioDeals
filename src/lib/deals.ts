@@ -175,22 +175,16 @@ export async function setDealLostReason(id: string, reason: string | null): Prom
   return flattenBoardRow(data)
 }
 
-// handoff_key isn't in the generated Database type yet (database.ts needs
-// regenerating after `alter table crm.deals add column handoff_key uuid`),
-// and postgrest-js's Update type actively rejects excess properties even on
-// a separately-declared object, so a narrow, explicit cast is needed for
-// just this one field rather than widening deals.Update speculatively. It's
-// write-only: nothing reads it back today — it's stored purely for the
-// future real StudioTime API call to use as an idempotency/correlation
-// token.
+// handoff_key is write-only: nothing reads it back today. It is stored purely
+// for the future real StudioTime API call to use as an idempotency and
+// correlation token.
 export async function markDealHandedOff(id: string): Promise<{ handedOffAt: string }> {
   const handedOffAt = new Date().toISOString()
-  const payload = { handed_off_at: handedOffAt, handoff_key: crypto.randomUUID() } as Pick<
-    DealRow,
-    'handed_off_at'
-  >
 
-  const { error } = await supabase.from('deals').update(payload).eq('id', id)
+  const { error } = await supabase
+    .from('deals')
+    .update({ handed_off_at: handedOffAt, handoff_key: crypto.randomUUID() })
+    .eq('id', id)
   if (error) throw error
 
   return { handedOffAt }

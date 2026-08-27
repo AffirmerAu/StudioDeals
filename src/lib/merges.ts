@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import type { Json } from '@/types/database'
 
 export type MergeEntityType = 'contact' | 'organisation'
 
@@ -17,45 +18,36 @@ export interface MergeLogRow {
   snapshot: Record<string, unknown>
 }
 
-interface RawMergeLogRow {
-  id: string
-  entity_type: string
-  survivor_id: string
-  merged_id: string
-  merged_at: string
-  merged_by: string | null
-  merged_name: string | null
-  survivor_name: string | null
-  merged_snapshot: Record<string, unknown> | null
-}
-
-// v_merge_log arrives in migration 007, so it isn't in the generated Database
-// type yet — database.ts needs regenerating. The cast is confined to this file.
-const client = supabase as unknown as {
-  from: (relation: string) => {
-    select: (columns: string) => {
-      limit: (n: number) => Promise<{ data: RawMergeLogRow[] | null; error: { message: string } | null }>
-    }
-  }
-}
-
 export const MERGES_PAGE_SIZE = 100
+
+/** merged_snapshot is typed Json, which allows a string or a number as well.
+ *  Every row the function writes is `to_jsonb(row)`, so it is always an
+ *  object — but the type cannot know that, and a snapshot that somehow was
+ *  not one should render as empty rather than crash the page. */
+function asObject(value: Json | null): Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {}
+}
 
 /** Newest first — the view is already ordered that way. */
 export async function listMerges(limit = MERGES_PAGE_SIZE): Promise<MergeLogRow[]> {
-  const { data, error } = await client.from('v_merge_log').select('*').limit(limit)
-  if (error) throw new Error(error.message)
+  const { data, error } = await supabase.from('v_merge_log').select('*').limit(limit)
+  if (error) throw error
 
+  // Every column is nullable because it is a view, but id, survivor_id,
+  // merged_id and merged_at all come straight off crm.merge_log's NOT NULL
+  // columns — only the two resolved names are genuinely optional.
   return (data ?? []).map((row) => ({
-    id: row.id,
+    id: row.id as string,
     entityType: row.entity_type === 'organisation' ? 'organisation' : 'contact',
-    survivorId: row.survivor_id,
-    mergedId: row.merged_id,
-    mergedAt: row.merged_at,
+    survivorId: row.survivor_id as string,
+    mergedId: row.merged_id as string,
+    mergedAt: row.merged_at as string,
     mergedBy: row.merged_by,
     mergedName: row.merged_name,
     survivorName: row.survivor_name,
-    snapshot: row.merged_snapshot ?? {},
+    snapshot: asObject(row.merged_snapshot),
   }))
 }
 

@@ -1,38 +1,5 @@
-import type { SupabaseClient } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
-
-/**
- * crm.targets isn't in the generated Database type yet — database.ts needs
- * regenerating after migrations/004_targets.sql runs. Until then this module
- * owns the row shape by hand and narrows the client once, here, so the escape
- * hatch stays at this one boundary rather than leaking into the dashboard.
- */
-export type TargetsRow = {
-  id: number
-  new_deals_per_month: number
-  won_deals_per_month: number
-  won_value_cents_per_month: number
-  updated_at: string
-}
-
-type TargetsDatabase = {
-  crm: {
-    Tables: {
-      targets: {
-        Row: TargetsRow
-        Insert: Partial<TargetsRow>
-        Update: Partial<TargetsRow>
-        Relationships: []
-      }
-    }
-    Views: Record<string, never>
-    Functions: Record<string, never>
-    Enums: Record<string, never>
-    CompositeTypes: Record<string, never>
-  }
-}
-
-const db = supabase as unknown as SupabaseClient<TargetsDatabase, 'crm'>
+import type { TargetsRow } from '@/types/crm'
 
 export type TargetValues = Pick<
   TargetsRow,
@@ -46,12 +13,12 @@ export const NO_TARGETS: TargetValues = {
 }
 
 /**
- * Fails soft: the dashboard is useful without targets, and before the
- * migration has been run the table simply isn't there. A missing table
- * shouldn't take the whole page down with it.
+ * Fails soft: the dashboard is useful without targets, and 004 seeds exactly
+ * one row that nothing can delete through the UI — but a missing row should
+ * show as "no target set" rather than taking the whole page down.
  */
 export async function fetchTargets(): Promise<TargetValues> {
-  const { data, error } = await db.from('targets').select('*').eq('id', 1).maybeSingle()
+  const { data, error } = await supabase.from('targets').select('*').eq('id', 1).maybeSingle()
   if (error || !data) return NO_TARGETS
 
   return {
@@ -62,7 +29,7 @@ export async function fetchTargets(): Promise<TargetValues> {
 }
 
 export async function saveTargets(values: TargetValues): Promise<TargetValues> {
-  const { data, error } = await db
+  const { data, error } = await supabase
     .from('targets')
     .update({ ...values, updated_at: new Date().toISOString() })
     .eq('id', 1)

@@ -48,49 +48,28 @@ export interface DuplicateContactPair {
   score: number
 }
 
-interface RawDuplicateContactRow {
-  id_a: string
-  name_a: string
-  email_a: string | null
-  id_b: string
-  name_b: string
-  email_b: string | null
-  organisation_name: string | null
-  match_on: string
-  score: number | null
-}
-
-/**
- * v_possible_duplicate_contacts and crm.merge_contacts arrive in migration
- * 007, so neither is in the generated Database type yet — database.ts needs
- * regenerating. The casts are confined to this file.
- */
-const client = supabase as unknown as {
-  from: (relation: string) => {
-    select: (columns: string) => {
-      limit: (n: number) => Promise<{ data: RawDuplicateContactRow[] | null; error: { message: string } | null }>
-    }
-  }
-  rpc: (fn: string, args: Record<string, string>) => Promise<{ error: { message: string } | null }>
-}
-
 export async function listDuplicateContactPairs(limit = 50): Promise<DuplicateContactPair[]> {
   // The view is already ordered by score — no .order() here, so a caller
   // can't accidentally re-sort away the email matches that lead it.
-  const { data, error } = await client.from('v_possible_duplicate_contacts').select('*').limit(limit)
-  if (error) throw new Error(error.message)
+  const { data, error } = await supabase.from('v_possible_duplicate_contacts').select('*').limit(limit)
+  if (error) throw error
 
-  return (data ?? []).map((row) => ({
-    idA: row.id_a,
-    nameA: row.name_a,
-    emailA: row.email_a,
-    idB: row.id_b,
-    nameB: row.name_b,
-    emailB: row.email_b,
-    organisationName: row.organisation_name,
-    matchOn: row.match_on === 'email' ? 'email' : 'name',
-    score: row.score ?? 0,
-  }))
+  // Same narrowing as the organisations view above: every column comes back
+  // nullable because it is a view, but the definition self-joins on non-null
+  // columns, so a row it returns cannot have holes in its ids or names.
+  return (data ?? [])
+    .filter((row) => row.id_a && row.id_b)
+    .map((row) => ({
+      idA: row.id_a as string,
+      nameA: row.name_a as string,
+      emailA: row.email_a,
+      idB: row.id_b as string,
+      nameB: row.name_b as string,
+      emailB: row.email_b,
+      organisationName: row.organisation_name,
+      matchOn: row.match_on === 'email' ? 'email' : 'name',
+      score: row.score ?? 0,
+    }))
 }
 
 /**
@@ -107,9 +86,10 @@ export async function mergeOrganisations(survivorId: string, loserId: string): P
   await callMerge('merge_organisations', survivorId, loserId)
 }
 
-async function callMerge(fn: string, survivor: string, loser: string): Promise<void> {
-  // Cast the client, not the method: pulling `supabase.rpc` out into a bare
-  // function detaches it from its receiver and the call silently never fires.
-  const { error } = await client.rpc(fn, { survivor, loser })
-  if (error) throw new Error(error.message)
+async function callMerge(fn: 'merge_contacts' | 'merge_organisations', survivor: string, loser: string) {
+  // Called as a method on supabase, never pulled out into a bare function:
+  // detaching `supabase.rpc` from its receiver makes the call silently never
+  // fire, which typecheck and build both let through.
+  const { error } = await supabase.rpc(fn, { survivor, loser })
+  if (error) throw error
 }
