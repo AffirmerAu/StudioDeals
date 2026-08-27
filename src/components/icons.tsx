@@ -97,3 +97,13 @@ export function SignOutIcon(props: SVGProps<SVGSVGElement>) {
     </Icon>
   )
 }
+
+export function TasksIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M3 6l1.75 1.75L8 4.5" />
+      <path d="M3 13l1.75 1.75L8 11.5" />
+      <path d="M11 6.5h6M11 14h6" />
+    </Icon>
+  )
+}

@@ -11,6 +11,7 @@ import { LoginPage } from '@/pages/LoginPage'
 // AppShell holds the Suspense boundary.
 const DashboardPage = lazy(() => import('@/pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
 const PipelinePage = lazy(() => import('@/pages/PipelinePage').then((m) => ({ default: m.PipelinePage })))
+const TasksPage = lazy(() => import('@/pages/TasksPage').then((m) => ({ default: m.TasksPage })))
 const DealsPage = lazy(() => import('@/pages/DealsPage').then((m) => ({ default: m.DealsPage })))
 const DealDetailPage = lazy(() =>
   import('@/pages/DealDetailPage').then((m) => ({ default: m.DealDetailPage })),
@@ -36,6 +37,7 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route index element={<DashboardPage />} />
           <Route path="pipeline" element={<PipelinePage />} />
+          <Route path="tasks" element={<TasksPage />} />
           <Route path="deals" element={<DealsPage />} />
           <Route path="deals/:dealId" element={<DealDetailPage />} />
           <Route path="contacts" element={<ContactsPage />} />
