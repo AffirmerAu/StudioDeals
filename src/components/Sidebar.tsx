@@ -11,12 +11,14 @@ import {
   PipelineIcon,
   SignOutIcon,
   SunIcon,
+  TasksIcon,
 } from '@/components/icons'
 
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: DashboardIcon, end: true },
   { to: '/pipeline', label: 'Pipeline', icon: PipelineIcon, end: false },
   { to: '/deals', label: 'Deals', icon: DealsIcon, end: false },
+  { to: '/tasks', label: 'Tasks', icon: TasksIcon, end: false },
   { to: '/contacts', label: 'Contacts', icon: ContactsIcon, end: false },
   { to: '/organisations', label: 'Organisations', icon: OrganisationsIcon, end: false },
 ] as const

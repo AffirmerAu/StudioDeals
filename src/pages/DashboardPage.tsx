@@ -1,4 +1,5 @@
 import { Suspense, lazy, useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { usePipelineStages } from '@/lib/pipeline-stages'
 import { useToast } from '@/lib/toast-context'
 import {
@@ -227,7 +228,11 @@ export function DashboardPage() {
               saying so is how a reminder quietly stops being one. */}
           {followUpTotal > openFollowUps.length && (
             <p className="mt-3 text-xs" style={{ color: 'var(--text-subtle)' }}>
-              Showing {openFollowUps.length} of {followUpTotal}. The rest are on their deals.
+              Showing {openFollowUps.length} of {followUpTotal}.{' '}
+              <Link to="/tasks" style={{ color: 'var(--color-brand-500)' }}>
+                See them all
+              </Link>
+              .
             </p>
           )}
         </div>

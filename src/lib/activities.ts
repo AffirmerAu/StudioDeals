@@ -207,6 +207,63 @@ export function isOverdue(dueAt: string | null, now = new Date()): boolean {
   return dueAt !== null && new Date(dueAt) < now
 }
 
+export const TASK_FILTERS = ['open', 'overdue', 'today', 'week', 'done'] as const
+export type TaskFilter = (typeof TASK_FILTERS)[number]
+
+export const TASK_FILTER_LABEL: Record<TaskFilter, string> = {
+  open: 'All open',
+  overdue: 'Overdue',
+  today: 'Due today',
+  week: 'Next 7 days',
+  done: 'Recently done',
+}
+
+/** End of the local day, as an instant. Due "today" means by tonight, in the
+ * timezone the person is standing in, not UTC. */
+function endOfToday(now = new Date()): string {
+  const d = new Date(now)
+  d.setHours(23, 59, 59, 999)
+  return d.toISOString()
+}
+
+function inDays(days: number, now = new Date()): string {
+  const d = new Date(now)
+  d.setDate(d.getDate() + days)
+  d.setHours(23, 59, 59, 999)
+  return d.toISOString()
+}
+
+export interface TaskListResult {
+  rows: OpenFollowUpRow[]
+  total: number
+}
+
+/**
+ * Everything with a due date, across deals, contacts and organisations —
+ * standalone tasks and follow-ups hung off a call or a quote alike.
+ */
+export async function listTasks(filter: TaskFilter, limit = 200): Promise<TaskListResult> {
+  const now = new Date()
+  let query = supabase
+    .from('activities')
+    .select('*, organisations(name), contacts(first_name, last_name), deals(title)', { count: 'exact' })
+    .not('due_at', 'is', null)
+
+  if (filter === 'done') {
+    query = query.not('completed_at', 'is', null).order('completed_at', { ascending: false })
+  } else {
+    query = query.is('completed_at', null).order('due_at', { ascending: true })
+    if (filter === 'overdue') query = query.lt('due_at', now.toISOString())
+    if (filter === 'today') query = query.lte('due_at', endOfToday(now))
+    if (filter === 'week') query = query.lte('due_at', inDays(7, now))
+  }
+
+  const { data, error, count } = await query.limit(limit)
+  if (error) throw error
+
+  return { rows: (data ?? []).map(flattenFollowUpRow), total: count ?? 0 }
+}
+
 export type OpenFollowUpRow = ActivityRow & {
   organisation_name: string | null
   contact_name: string | null
@@ -217,6 +274,16 @@ type RawFollowUpRow = ActivityRow & {
   organisations: { name: string } | null
   contacts: { first_name: string; last_name: string | null } | null
   deals: { title: string } | null
+}
+
+function flattenFollowUpRow(row: RawFollowUpRow): OpenFollowUpRow {
+  const { organisations, contacts, deals, ...activity } = row
+  return {
+    ...activity,
+    organisation_name: organisations?.name ?? null,
+    contact_name: contacts ? [contacts.first_name, contacts.last_name].filter(Boolean).join(' ') : null,
+    deal_title: deals?.title ?? null,
+  }
 }
 
 /**
@@ -235,15 +302,7 @@ export async function listOpenFollowUps(limit = 8): Promise<{ rows: OpenFollowUp
 
   if (error) throw error
 
-  const rows = (data ?? []).map((row: RawFollowUpRow) => {
-    const { organisations, contacts, deals, ...activity } = row
-    return {
-      ...activity,
-      organisation_name: organisations?.name ?? null,
-      contact_name: contacts ? [contacts.first_name, contacts.last_name].filter(Boolean).join(' ') : null,
-      deal_title: deals?.title ?? null,
-    }
-  })
+  const rows = (data ?? []).map(flattenFollowUpRow)
 
   // The count matters more than it used to: now that tasks are easy to raise,
   // the list will routinely exceed the limit, and silently showing the first
