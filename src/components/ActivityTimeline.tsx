@@ -3,6 +3,7 @@ import {
   ACTIVITY_TYPE_LABEL,
   deleteActivity,
   listActivities,
+  notePreview,
   setActivityCompleted,
   type TimelineActivityRow,
 } from '@/lib/activities'
@@ -233,12 +234,15 @@ function ActivityItem({
             type="button"
             onClick={() => setExpanded((open) => !open)}
             aria-expanded={expanded}
-            className="flex min-w-0 items-center gap-1 text-left text-sm font-medium"
+            className="flex min-w-0 cursor-pointer items-center gap-1.5 text-left text-sm font-medium"
           >
+            {/* Sized and weighted to be findable. At 14px in --text-subtle it
+                was a smudge, and a control nobody can see is not a control. */}
             <ChevronDownIcon
-              className="size-3.5 shrink-0 transition-transform duration-150"
+              strokeWidth={2}
+              className="size-4 shrink-0 transition-transform duration-150"
               style={{
-                color: 'var(--text-subtle)',
+                color: 'var(--color-brand-500)',
                 transform: expanded ? undefined : 'rotate(-90deg)',
               }}
             />
@@ -259,7 +263,7 @@ function ActivityItem({
       <div className="mt-0.5 flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
         <span>{ACTIVITY_TYPE_LABEL[activity.type] ?? activity.type}</span>
         {activity.contact_name && <span className="shrink-0">· {activity.contact_name}</span>}
-        {activity.notes && !expanded && <span className="truncate">{activity.notes}</span>}
+        {activity.notes && !expanded && <span className="truncate">{notePreview(activity.notes)}</span>}
       </div>
 
       {activity.notes && expanded && (

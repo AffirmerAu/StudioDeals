@@ -17,6 +17,30 @@ export const ACTIVITY_TYPE_LABEL: Record<string, string> = {
   task: 'Task',
 }
 
+/**
+ * The one-line preview for a collapsed timeline entry.
+ *
+ * An email filed from Gmail opens with a From / To / Date block, and
+ * previewing that tells the reader what the row above already says. Skip to
+ * the body — but only for a note that actually has that shape, so a note
+ * someone typed is previewed as written.
+ */
+export function notePreview(notes: string): string {
+  const split = notes.indexOf('\n\n')
+  const body = /^From: /.test(notes) && split !== -1 ? notes.slice(split + 2) : notes
+  return (body.trim() || notes).replace(/\s+/g, ' ').trim()
+}
+
+/**
+ * "an email", "a call" — for the "from a …" line on a follow-up that hangs off
+ * a logged activity rather than a task someone raised. Email is the only
+ * vowel-initial label in ACTIVITY_TYPE_LABEL, and it read as "from a email".
+ */
+export function activityTypePhrase(type: string): string {
+  const label = (ACTIVITY_TYPE_LABEL[type] ?? type).toLowerCase()
+  return `${/^[aeiou]/.test(label) ? 'an' : 'a'} ${label}`
+}
+
 /** Types that crm.sync_last_contacted() treats as real contact — logging one
  * against a contact refreshes their last_contacted_at and clears the stale
  * flag. Notes and tasks deliberately don't count. */
