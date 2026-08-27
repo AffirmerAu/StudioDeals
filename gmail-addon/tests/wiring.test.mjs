@@ -106,12 +106,20 @@ const writes = [...sources.get('Api.gs').matchAll(/apiFetch\(\s*'([^']+)'[^)]*me
 check('the only write path is /activities',
   writes.every((p) => p === '/activities' || p.startsWith('/rpc/')), writes.join(', '))
 check('every filed row carries its gmail_message_id',
-  /gmail_message_id:\s*message\.id/.test(sources.get('Code.gs')))
+  /gmail_message_id:\s*message\.id/.test(sources.get('Text.gs')))
 check('filing reads before it writes',
   sources.get('Code.gs').indexOf('findSavedMessageIds') <
     sources.get('Code.gs').indexOf('insertActivities'))
 check('occurred_at is the message date, never now()',
-  /occurred_at:\s*message\.dateIso/.test(sources.get('Code.gs')))
+  /occurred_at:\s*message\.dateIso/.test(sources.get('Text.gs')))
+// The event's thread id is Gmail's legacy form and does not match the one
+// GmailApp reports, so filing must never mix the two sources.
+check('the stored thread id comes from GmailApp, not the event',
+  !/gmail_thread_id[\s\S]{0,80}event\.gmail\.threadId/.test(all) &&
+  /threadId:\s*threadId/.test(sources.get('Message.gs')))
+check('Text.gs stays free of Apps Script globals, or Node cannot test it',
+  !/\b(CardService|GmailApp|UrlFetchApp|PropertiesService|CacheService|LockService|Session|Utilities)\b/
+    .test(stripComments(sources.get('Text.gs'))))
 check('money is never parsed out of a string',
   !/parseFloat|Number\(.*\$/.test(sources.get('Text.gs')))
 

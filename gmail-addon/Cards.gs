@@ -157,6 +157,33 @@ function saveCard(context) {
     )
     .addWidget(picker);
 
+  var thread = context.thread;
+  if (thread.messages.length > 1) {
+    section.addWidget(
+      CardService.newSelectionInput()
+        .setType(CardService.SelectionInputType.CHECK_BOX)
+        .setFieldName('scope')
+        .addItem('The whole thread — ' + thread.messages.length + ' messages', 'thread', false),
+    );
+    // Anything already filed is skipped on the way in, so ticking this a
+    // second time after a reply arrives costs one row, not the whole thread.
+    section.addWidget(
+      CardService.newTextParagraph().setText('Messages already filed are skipped.'),
+    );
+  }
+
+  if (thread.total > thread.messages.length) {
+    section.addWidget(
+      CardService.newTextParagraph().setText(
+        '<b>' +
+          thread.messages.length +
+          ' of ' +
+          thread.total +
+          ' messages in this thread can be read.</b> The rest cannot be filed.',
+      ),
+    );
+  }
+
   if (!deals.length) {
     section.addWidget(
       CardService.newTextParagraph().setText(
@@ -190,15 +217,16 @@ function saveResultCard(result) {
   var section = CardService.newCardSection()
     .addWidget(
       CardService.newDecoratedText()
-        .setTopLabel(result.alreadyHeld ? 'Already filed' : 'Filed against')
+        .setTopLabel('Filed against')
         .setText(result.target)
         .setWrapText(true),
     )
+    .addWidget(CardService.newTextParagraph().setText(describeFiling(result.filed, result.skipped)))
     .addWidget(
       CardService.newTextParagraph().setText(
-        result.alreadyHeld
-          ? 'StudioDeals already had this message, so nothing was written twice.'
-          : 'It is on the timeline now, dated when it was sent.',
+        result.filed
+          ? 'Each one is on the timeline dated when it was sent, not when it was filed.'
+          : 'Nothing was written twice.',
       ),
     );
 

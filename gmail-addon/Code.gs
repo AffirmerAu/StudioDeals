@@ -109,10 +109,6 @@ function actionParam(event, name) {
 }
 
 
-/** How much of the body goes into the note. Context, not an archive. */
-var BODY_EXCERPT_LIMIT = 500;
-
-
 /** The one contact this address resolves to, re-read rather than carried
  *  across the action so the card never files against a stale record. */
 function contactFor(contactId) {
@@ -133,6 +129,7 @@ function handleShowSave(event) {
         CardService.newNavigation().pushCard(
           saveCard({
             message: readOpenMessage(event),
+            thread: readThread(event),
             contact: contact,
             deals: listOpenDeals(contact.organisation_id),
           }),
@@ -147,58 +144,69 @@ function handleShowSave(event) {
 
 function handleSaveMessage(event) {
   try {
-    var contactId = actionParam(event, 'contactId');
-    var organisationId = actionParam(event, 'organisationId');
-    var dealId = String(formValue(event, 'dealId') || '');
-
-    var message = readOpenMessage(event);
-    var held = findSavedMessageIds([message.id]);
-
-    var target;
-    if (dealId) {
-      var deals = listOpenDeals(organisationId);
-      target = 'the deal';
-      for (var i = 0; i < deals.length; i++) {
-        if (deals[i].id === dealId) target = deals[i].title;
-      }
-    } else {
-      var contact = contactFor(contactId);
-      target = [contact.first_name, contact.last_name].filter(Boolean).join(' ');
-    }
-
-    if (!held[message.id]) {
-      insertActivities([
-        {
-          deal_id: dealId || null,
-          contact_id: contactId,
-          organisation_id: organisationId || null,
-          type: 'email',
-          subject: message.subject || null,
-          notes: buildNote(message, readMessageBody(event), BODY_EXCERPT_LIMIT),
-          occurred_at: message.dateIso,
-          created_by: currentUserId(),
-          gmail_message_id: message.id,
-          gmail_thread_id: message.threadId || null,
-        },
-      ]);
-    }
-
-    var result = {
-      alreadyHeld: !!held[message.id],
-      target: target,
-      dealId: dealId,
-      contactId: contactId,
+    var target = {
+      contactId: actionParam(event, 'contactId'),
+      organisationId: actionParam(event, 'organisationId'),
+      dealId: String(formValue(event, 'dealId') || ''),
+      createdBy: currentUserId(),
     };
 
+    var thread = readThread(event);
+    var wholeThread = String(formValue(event, 'scope') || '') === 'thread';
+
+    var chosen = [];
+    for (var i = 0; i < thread.messages.length; i++) {
+      if (wholeThread || thread.messages[i].id === event.gmail.messageId) {
+        chosen.push(thread.messages[i]);
+      }
+    }
+
+    var ids = [];
+    for (var j = 0; j < chosen.length; j++) ids.push(chosen[j].id);
+    var held = findSavedMessageIds(ids);
+
+    var rows = [];
+    var skipped = 0;
+    for (var k = 0; k < chosen.length; k++) {
+      if (held[chosen[k].id]) skipped++;
+      else rows.push(activityRow(chosen[k], target));
+    }
+
+    insertActivities(rows);
+
     return CardService.newActionResponseBuilder()
-      .setNavigation(CardService.newNavigation().updateCard(saveResultCard(result)))
+      .setNavigation(
+        CardService.newNavigation().updateCard(
+          saveResultCard({
+            filed: rows.length,
+            skipped: skipped,
+            target: describeTarget(target),
+            dealId: target.dealId,
+            contactId: target.contactId,
+          }),
+        ),
+      )
       .setNotification(
-        CardService.newNotification().setText(result.alreadyHeld ? 'Already filed' : 'Filed'),
+        CardService.newNotification().setText(describeFiling(rows.length, skipped)),
       )
       .build();
   } catch (err) {
     return replaceWith(err.name === 'AuthRequiredError' ? signInCard(err.message) : errorCard(err));
   }
+}
+
+
+/** What the result card calls the thing it filed against. */
+function describeTarget(target) {
+  if (target.dealId) {
+    var deals = listOpenDeals(target.organisationId);
+    for (var i = 0; i < deals.length; i++) {
+      if (deals[i].id === target.dealId) return deals[i].title;
+    }
+    return 'the deal';
+  }
+  var contact = contactFor(target.contactId);
+  return [contact.first_name, contact.last_name].filter(Boolean).join(' ');
 }
 
 

@@ -221,3 +221,35 @@ function buildNote(headers, body, limit) {
   var excerpt = truncate(cleanBody(body), limit);
   return excerpt ? lines.join('\n') + '\n\n' + excerpt : lines.join('\n');
 }
+
+
+/** "3 filed", "1 filed, 2 already held", "nothing new to file". */
+function describeFiling(filed, skipped) {
+  if (!filed && !skipped) return 'Nothing to file.';
+  if (!filed) return skipped === 1 ? 'Already filed.' : 'All ' + skipped + ' already filed.';
+
+  var text = filed === 1 ? '1 message filed' : filed + ' messages filed';
+  if (skipped) text += ', ' + skipped + ' already held';
+  return text + '.';
+}
+
+
+/** How much of the body goes into the note. Context, not an archive. */
+var BODY_EXCERPT_LIMIT = 500;
+
+
+/** One activity row for one Gmail message, against the chosen target. */
+function activityRow(message, target) {
+  return {
+    deal_id: target.dealId || null,
+    contact_id: target.contactId,
+    organisation_id: target.organisationId || null,
+    type: 'email',
+    subject: message.subject || null,
+    notes: buildNote(message, message.body, BODY_EXCERPT_LIMIT),
+    occurred_at: message.dateIso,
+    created_by: target.createdBy,
+    gmail_message_id: message.id,
+    gmail_thread_id: message.threadId || null,
+  };
+}

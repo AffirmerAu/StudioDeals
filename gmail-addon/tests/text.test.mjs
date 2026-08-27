@@ -16,7 +16,7 @@ const T = new Function(
   src +
     '\nreturn { splitAddressList, parseAddress, parseAddressList, sameAddress,' +
     ' pickCounterparty, displayNameFor, describeLastContacted, truncate,' +
-    ' formatCents, isQuoteBoundary, cleanBody, buildNote };',
+    ' formatCents, isQuoteBoundary, cleanBody, buildNote, describeFiling, activityRow };',
 )()
 
 let passed = 0
@@ -184,6 +184,58 @@ is(
   'a body with nothing left after cleaning leaves headers alone',
   T.buildNote(HEADERS, '> only quotes', 500),
   'From: Kieran Jessup <KieranJessup@whittensgroup.com.au>\nTo: matt@affirmer.com.au\nDate: 24 Aug 2026, 5:06 pm',
+)
+
+// ---------- what the card says it did ----------
+is('one message', T.describeFiling(1, 0), '1 message filed.')
+is('several', T.describeFiling(3, 0), '3 messages filed.')
+is('some new, some held', T.describeFiling(1, 2), '1 message filed, 2 already held.')
+is('one already held', T.describeFiling(0, 1), 'Already filed.')
+is('all already held', T.describeFiling(0, 4), 'All 4 already filed.')
+is('nothing at all', T.describeFiling(0, 0), 'Nothing to file.')
+
+// ---------- the row that reaches the CRM ----------
+const MSG = {
+  id: '18f2a9c4b1',
+  threadId: 'thread-a:r-7012497993290584413',
+  subject: 'Re: Komms Essential Rules',
+  from: 'Kieran Jessup <kieranjessup@whittensgroup.com.au>',
+  to: 'matt@affirmer.com.au',
+  cc: '',
+  dateText: '17 Aug 2026, 11:39 am',
+  dateIso: '2026-08-17T01:39:00.000Z',
+  body: 'Hi Matt,\n\nLeave it with me.\n\nOn Mon, 17 Aug 2026, Matt wrote:\n> anything?',
+}
+const TARGET = {
+  contactId: 'aaaa-1111',
+  organisationId: 'bbbb-2222',
+  dealId: 'dddd-3333',
+  createdBy: 'user-9999',
+}
+
+const row = T.activityRow(MSG, TARGET)
+is('it is always an email', row.type, 'email')
+is('occurred_at is the message date, never now()', row.occurred_at, MSG.dateIso)
+is('the gmail ids travel with it', [row.gmail_message_id, row.gmail_thread_id], [MSG.id, MSG.threadId])
+is('the target is carried through', [row.deal_id, row.contact_id, row.organisation_id],
+  [TARGET.dealId, TARGET.contactId, TARGET.organisationId])
+is('the author is the token subject', row.created_by, TARGET.createdBy)
+is('the quoted history did not make it into the note', row.notes.includes('anything?'), false)
+is('but the message did', row.notes.includes('Leave it with me.'), true)
+is(
+  'a missing deal is null, not an empty string',
+  T.activityRow(MSG, { ...TARGET, dealId: '' }).deal_id,
+  null,
+)
+is(
+  'a missing subject is null, not "(no subject)"',
+  T.activityRow({ ...MSG, subject: '' }, TARGET).subject,
+  null,
+)
+is(
+  'every row has the same keys, whatever is missing',
+  Object.keys(T.activityRow({ ...MSG, subject: '', cc: '' }, { ...TARGET, dealId: '' })),
+  Object.keys(row),
 )
 
 // ---------- report ----------

@@ -9,7 +9,11 @@ the contact alone — dated when the message was sent, carrying enough of the
 body to recognise it later, and with the Gmail ids that make a second File It
 a no-op instead of a duplicate.
 
-Creating contacts, setting tasks, and saving a whole thread come next.
+Ticking **the whole thread** files every message in the conversation at once,
+skipping any already held — so after a reply arrives, filing again costs one
+row rather than the whole thread over again.
+
+Creating contacts and setting tasks come next.
 
 ## Prerequisites
 
@@ -101,6 +105,18 @@ partial unique index on `gmail_message_id` is the backstop, not the mechanism.
 in the right place on the timeline rather than at the top of it. `type` is
 `email`, which `crm.sync_last_contacted` counts as real contact — filing
 refreshes the contact and clears the stale flag.
+
+The thread id stored is the one `GmailApp` reports, never `event.gmail.threadId`.
+The event carries Gmail's legacy form (`thread-a:r-7012497993290584413`) and
+the two do not match, so mixing them would scatter one conversation across two
+ids. There is a wiring assertion holding that line.
+
+Whether the whole thread is readable at all was an open question: the narrow
+scope is documented as granting access to the *current* message. It turns out
+the siblings come through — measured on a real four-message thread, not
+assumed — so `Save whole thread` needs no extra scope. `CONFIG.DEBUG` keeps
+reporting it, because a deployment whose scope was later narrowed would say so
+there first.
 
 The note is `From` / `To` / `Cc` / `Date`, a blank line, and the first 500
 characters of the body with quoted history removed. Context, not an archive:

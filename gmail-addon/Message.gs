@@ -12,11 +12,27 @@ function readOpenMessage(event) {
   GmailApp.setCurrentMessageAccessToken(event.gmail.accessToken);
   var message = GmailApp.getMessageById(event.gmail.messageId);
 
-  var date = message.getDate();
+  return describeMessage(message, message.getThread().getId(), false);
+}
 
-  return {
-    id: event.gmail.messageId,
-    threadId: event.gmail.threadId,
+
+/**
+ * One message as the CRM wants it.
+ *
+ * The thread id comes from GmailApp rather than from event.gmail.threadId,
+ * and that is deliberate. The event's id arrives in Gmail's legacy form,
+ * which is not the id GmailApp reports for the same conversation — filing one
+ * message from the event and its siblings from the thread would scatter a
+ * single conversation across two ids. One source, always.
+ *
+ * getPlainBody() is the call that fails on a message this deployment is not
+ * allowed to read, so `withBody` is what makes a message readable or not.
+ */
+function describeMessage(message, threadId, withBody) {
+  var date = message.getDate();
+  var described = {
+    id: message.getId(),
+    threadId: threadId,
     subject: message.getSubject(),
     from: message.getFrom(),
     to: message.getTo(),
@@ -25,6 +41,40 @@ function readOpenMessage(event) {
     dateIso: date.toISOString(),
     dateText: messageDateText(date),
   };
+  if (withBody) described.body = message.getPlainBody();
+  return described;
+}
+
+
+/**
+ * Every message in the open thread that this deployment can actually read,
+ * oldest first.
+ *
+ * Under gmail.addons.current.message.readonly the siblings do come through —
+ * measured, not assumed, by the Diagnostics probe on a real four-message
+ * thread. `total` is kept alongside so a thread that ever does come back
+ * partial says so instead of quietly filing less than it claims.
+ */
+function readThread(event) {
+  GmailApp.setCurrentMessageAccessToken(event.gmail.accessToken);
+  var thread = GmailApp.getMessageById(event.gmail.messageId).getThread();
+  var threadId = thread.getId();
+  var messages = thread.getMessages();
+
+  var readable = [];
+  for (var i = 0; i < messages.length; i++) {
+    try {
+      readable.push(describeMessage(messages[i], threadId, true));
+    } catch (ignored) {
+      // In the thread, but not ours to read.
+    }
+  }
+
+  readable.sort(function (a, b) {
+    return a.date - b.date;
+  });
+
+  return { threadId: threadId, total: messages.length, messages: readable };
 }
 
 
@@ -34,15 +84,6 @@ function messageDateText(date) {
   return Utilities.formatDate(date, Session.getScriptTimeZone(), 'd MMM yyyy, h:mm a');
 }
 
-
-/**
- * The body, fetched only when something is about to be filed. Every message
- * open would otherwise pay for text no card displays.
- */
-function readMessageBody(event) {
-  GmailApp.setCurrentMessageAccessToken(event.gmail.accessToken);
-  return GmailApp.getMessageById(event.gmail.messageId).getPlainBody();
-}
 
 
 /** The signed-in user's own address, so the card can tell which side of the
@@ -63,30 +104,13 @@ function myEmailAddress() {
 
 
 /**
- * Asks the deployment a question the documentation cannot answer from here:
- * under the current-message scope, how much of the open thread can actually
- * be read?
- *
- * `readable` is the number of messages whose body came back. If it is 1 on a
- * thread of several, "Save whole thread" is not buildable without widening to
- * gmail.readonly — which is the whole mailbox, and a decision rather than a
- * detail. Shown in the Diagnostics section until the first deploy settles it.
+ * The Diagnostics line. Kept after it answered its question, because a
+ * deployment whose scope is later narrowed would show it here first.
  */
 function probeThreadAccess(event) {
   try {
-    GmailApp.setCurrentMessageAccessToken(event.gmail.accessToken);
-    var messages = GmailApp.getMessageById(event.gmail.messageId).getThread().getMessages();
-
-    var readable = 0;
-    for (var i = 0; i < messages.length; i++) {
-      try {
-        messages[i].getPlainBody();
-        readable++;
-      } catch (ignored) {
-        // This message is in the thread but not ours to read.
-      }
-    }
-    return { total: messages.length, readable: readable, error: null };
+    var thread = readThread(event);
+    return { total: thread.total, readable: thread.messages.length, error: null };
   } catch (err) {
     return { total: 0, readable: 0, error: String(err && err.message ? err.message : err) };
   }
