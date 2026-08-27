@@ -12,6 +12,8 @@ setting tasks come next.
 
 - `migrations/009_gmail_messages.sql` applied. The card calls
   `crm.find_contacts_by_email`, which that migration creates.
+- The Apps Script API switched on at <https://script.google.com/home/usersettings>.
+  `clasp` cannot do anything until it is, and the error says so.
 - A Google Cloud project with the Gmail API enabled and its consent screen set
   to **Internal**, with its project number pasted into the Apps Script
   project's settings. Internal is what keeps this out of Google's OAuth
@@ -20,18 +22,37 @@ setting tasks come next.
 
 ## Deploy
 
+Every command below runs **from inside `gmail-addon/`**, in a clone of this
+repository. `clasp` writes into the working directory and pushes what it finds
+there, so running it anywhere else either fails on permissions or uploads the
+wrong thing.
+
+The Apps Script project already exists — its id is in `.clasp.json.example`,
+so there is nothing to create:
+
+    git clone https://github.com/AffirmerAu/StudioDeals.git
+    cd StudioDeals/gmail-addon
+    copy .clasp.json.example .clasp.json      # cp on macOS and Linux
     npx @google/clasp login
-    cd gmail-addon
-    npx @google/clasp create --type standalone --title "StudioDeals"
     npx @google/clasp push
 
 Then in the Apps Script editor: **Deploy → Test deployments → Install**.
 Reload Gmail and open any message.
 
-`clasp create` writes `.clasp.json` with the script id. It is gitignored —
-the script id is not a secret, but it is yours and not the repository's.
-
 Subsequent changes are `npx @google/clasp push` and a Gmail reload.
+
+`.clasp.json` itself is gitignored, because `clasp` rewrites it as it goes and
+adds the Cloud project id to it. The example holds the one value worth
+keeping.
+
+### If you ever do need a new script project
+
+    npx @google/clasp create --type standalone --title "StudioDeals"
+
+from inside `gmail-addon/`, then copy the new id into `.clasp.json.example`.
+Running it from the wrong directory still creates the project on Google's side
+before it fails locally — so check <https://script.google.com/home> for an
+orphan before creating another one.
 
 ## Files
 

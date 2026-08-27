@@ -75,6 +75,17 @@ check('.claspignore lists nothing that is gone',
   [...kept].every((k) => k === 'appsscript.json' || files.includes(k)),
   [...kept].filter((k) => k !== 'appsscript.json' && !files.includes(k)).join(', '))
 
+// ---- the clasp config example stays usable ----
+// .clasp.json is gitignored because clasp rewrites it, so a fresh clone has
+// nothing to push with until this file is copied over it.
+const example = JSON.parse(readFileSync(join(addon, '.clasp.json.example'), 'utf8'))
+check('the example carries a script id', /^[A-Za-z0-9_-]{20,}$/.test(example.scriptId || ''),
+  JSON.stringify(example.scriptId))
+check('the example points clasp at this directory', example.rootDir === '.', example.rootDir)
+check('.clasp.json is gitignored',
+  readFileSync(join(addon, '..', '.gitignore'), 'utf8').includes('gmail-addon/.clasp.json'))
+check('.claspignore keeps the example local', !kept.has('.clasp.json.example'))
+
 // ---- the things that must never be true ----
 // Against the code, not the comments — Config.gs says the words "service_role
 // key" precisely to forbid it.
