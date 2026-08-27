@@ -66,6 +66,11 @@ export async function listActivities({
   let query = supabase
     .from('activities')
     .select(TIMELINE_SELECT)
+    // An open task is an intention, not something that happened, so it is kept
+    // out of the history and lives in the tasks panel instead. Completing one
+    // moves its occurred_at to the moment it was done (see
+    // setActivityCompleted), which is where it then belongs on the timeline.
+    .or('type.neq.task,completed_at.not.is.null')
     .order('occurred_at', { ascending: false })
     .range(offset, offset + ACTIVITIES_PAGE_SIZE)
 
@@ -119,17 +124,87 @@ export async function deleteActivity(id: string): Promise<void> {
   if (error) throw error
 }
 
-/** Ticking a follow-up off is just stamping completed_at; clearing it reopens. */
-export async function setActivityCompleted(id: string, completed: boolean): Promise<TimelineActivityRow> {
+/**
+ * Ticking a follow-up off is just stamping completed_at; clearing it reopens.
+ *
+ * A task also has its occurred_at moved to now. A task's occurred_at is a
+ * placeholder while it is open — it is set at creation because the column is
+ * NOT NULL, and the task is hidden from the timeline until it is done — so
+ * completing one is the first moment it means anything. When it was raised is
+ * still in created_at.
+ */
+export async function setActivityCompleted(
+  id: string,
+  completed: boolean,
+  type?: string,
+): Promise<TimelineActivityRow> {
+  const now = new Date().toISOString()
   const { data, error } = await supabase
     .from('activities')
-    .update({ completed_at: completed ? new Date().toISOString() : null })
+    .update({
+      completed_at: completed ? now : null,
+      ...(completed && type === 'task' ? { occurred_at: now } : {}),
+    })
     .eq('id', id)
     .select(TIMELINE_SELECT)
     .single()
 
   if (error) throw error
   return flattenTimelineRow(data)
+}
+
+// ------------------------------------------------------------------- tasks
+
+/**
+ * Everything outstanding on a record: standalone tasks, and follow-ups hung
+ * off a call or a quote. Both are work owed, and the dashboard has always
+ * treated them the same way. Soonest first, so overdue leads.
+ */
+export async function listOpenTasksFor(dealId: string): Promise<TimelineActivityRow[]> {
+  const { data, error } = await supabase
+    .from('activities')
+    .select(TIMELINE_SELECT)
+    .eq('deal_id', dealId)
+    .not('due_at', 'is', null)
+    .is('completed_at', null)
+    .order('due_at', { ascending: true })
+
+  if (error) throw error
+  return (data ?? []).map(flattenTimelineRow)
+}
+
+export interface TaskDraft {
+  subject: string
+  dueAt: string
+  notes: string | null
+  dealId: string
+  organisationId: string | null
+  contactId: string | null
+}
+
+/**
+ * A task is an activity with type 'task' and a due date. occurred_at is set to
+ * now only because the column is NOT NULL — it is not read while the task is
+ * open, and completing the task overwrites it.
+ */
+export async function createTask(draft: TaskDraft, createdBy: string | null): Promise<TimelineActivityRow> {
+  return createActivity(
+    {
+      type: 'task',
+      subject: draft.subject.trim() || null,
+      notes: draft.notes?.trim() || null,
+      occurred_at: new Date().toISOString(),
+      due_at: draft.dueAt,
+      deal_id: draft.dealId,
+      organisation_id: draft.organisationId,
+      contact_id: draft.contactId,
+    },
+    createdBy,
+  )
+}
+
+export function isOverdue(dueAt: string | null, now = new Date()): boolean {
+  return dueAt !== null && new Date(dueAt) < now
 }
 
 export type OpenFollowUpRow = ActivityRow & {
@@ -149,10 +224,10 @@ type RawFollowUpRow = ActivityRow & {
  * follow-up hung off a call or a quote. Soonest first; overdue rows therefore
  * surface at the top.
  */
-export async function listOpenFollowUps(limit = 8): Promise<OpenFollowUpRow[]> {
-  const { data, error } = await supabase
+export async function listOpenFollowUps(limit = 8): Promise<{ rows: OpenFollowUpRow[]; total: number }> {
+  const { data, error, count } = await supabase
     .from('activities')
-    .select('*, organisations(name), contacts(first_name, last_name), deals(title)')
+    .select('*, organisations(name), contacts(first_name, last_name), deals(title)', { count: 'exact' })
     .not('due_at', 'is', null)
     .is('completed_at', null)
     .order('due_at', { ascending: true })
@@ -160,7 +235,7 @@ export async function listOpenFollowUps(limit = 8): Promise<OpenFollowUpRow[]> {
 
   if (error) throw error
 
-  return (data ?? []).map((row: RawFollowUpRow) => {
+  const rows = (data ?? []).map((row: RawFollowUpRow) => {
     const { organisations, contacts, deals, ...activity } = row
     return {
       ...activity,
@@ -169,4 +244,9 @@ export async function listOpenFollowUps(limit = 8): Promise<OpenFollowUpRow[]> {
       deal_title: deals?.title ?? null,
     }
   })
+
+  // The count matters more than it used to: now that tasks are easy to raise,
+  // the list will routinely exceed the limit, and silently showing the first
+  // eight of thirty is how a reminder stops being one.
+  return { rows, total: count ?? rows.length }
 }
