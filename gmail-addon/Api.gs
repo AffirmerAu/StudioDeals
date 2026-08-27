@@ -215,3 +215,67 @@ function fileActivities(rows) {
     return { filed: filed, duplicates: duplicates };
   }
 }
+
+
+/**
+ * Organisations to offer when creating a contact.
+ *
+ * Domain matches come first and are the ones that are usually right: if
+ * anybody already in StudioDeals has an address at whittensgroup.com.au, the
+ * organisation is not a guess. Every other organisation follows by name, so a
+ * client who writes from a personal address is still one dropdown away.
+ */
+function organisationChoices(domain) {
+  var chosen = [];
+  var seen = {};
+
+  if (domain) {
+    var related = apiFetch(contactsByDomainPath(domain), {});
+    for (var i = 0; i < related.length; i++) {
+      var id = related[i].organisation_id;
+      var org = related[i].organisations;
+      if (id && org && !seen[id]) {
+        seen[id] = true;
+        chosen.push({ id: id, name: org.name, matched: true });
+      }
+    }
+  }
+
+  var all = apiFetch(organisationsPath(), {});
+  for (var j = 0; j < all.length; j++) {
+    if (!seen[all[j].id]) {
+      seen[all[j].id] = true;
+      chosen.push({ id: all[j].id, name: all[j].name, matched: false });
+    }
+  }
+  return chosen;
+}
+
+
+/** Returns the created row, so the card that follows can name it. */
+function createOrganisationNamed(name) {
+  var rows = apiFetch('/organisations', {
+    method: 'post',
+    payload: [{ name: name, industry: null, website: null, abn: null, account_number: null,
+                address: null, is_client: false, notes: null }],
+    prefer: 'return=representation',
+  });
+  return rows[0];
+}
+
+
+function createContactRow(row) {
+  var rows = apiFetch('/contacts', {
+    method: 'post',
+    payload: [row],
+    prefer: 'return=representation',
+  });
+  return rows[0];
+}
+
+
+/** Tasks go through the same table and the same tolerant writer as filed
+ *  email, so nothing about them is a second code path. */
+function createTaskRow(row) {
+  return fileActivities([row]);
+}

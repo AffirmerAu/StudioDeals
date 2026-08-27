@@ -18,7 +18,8 @@ const T = new Function(
     ' pickCounterparty, displayNameFor, describeLastContacted, truncate,' +
     ' formatCents, isQuoteBoundary, cleanBody, buildNote, describeFiling, activityRow,' +
     ' activitiesInThreadPath, openDealsPath, contactPath, stagesPath, urlSafe,' +
-    ' isDuplicateError };',
+    ' isDuplicateError, emailDomain, splitDisplayName, organisationNameFromDomain,' +
+    ' contactsByDomainPath, organisationsPath, dueAtFromPicker, contactRow, taskRow };',
 )()
 
 let passed = 0
@@ -219,6 +220,7 @@ const row = T.activityRow(MSG, TARGET)
 is('it is always an email', row.type, 'email')
 is('occurred_at is the message date, never now()', row.occurred_at, MSG.dateIso)
 is('the gmail ids travel with it', [row.gmail_message_id, row.gmail_thread_id], [MSG.id, MSG.threadId])
+is('a filed email has no due date', row.due_at, null)
 is('the target is carried through', [row.deal_id, row.contact_id, row.organisation_id],
   [TARGET.dealId, TARGET.contactId, TARGET.organisationId])
 is('the author is the token subject', row.created_by, TARGET.createdBy)
@@ -280,6 +282,89 @@ is(
 )
 is('a plain string error', T.isDuplicateError('StudioDeals 409: duplicate'), true)
 is('nothing at all', T.isDuplicateError(null), false)
+
+// ---------- domains ----------
+is('an ordinary address', T.emailDomain('kieranjessup@whittensgroup.com.au'), 'whittensgroup.com.au')
+is('case is normalised', T.emailDomain('Kieran@Whittens.COM.AU'), 'whittens.com.au')
+is('a plus tag does not confuse it', T.emailDomain('matt+crm@affirmer.com.au'), 'affirmer.com.au')
+is('no @ means no domain', T.emailDomain('not an address'), '')
+is('null means no domain', T.emailDomain(null), '')
+
+// ---------- names ----------
+is('a display name splits', T.splitDisplayName('Kieran Jessup', 'k@x.com'), { first: 'Kieran', last: 'Jessup' })
+is('a middle name stays with the surname',
+  T.splitDisplayName('Anna Maria Ferreira', 'a@x.com'), { first: 'Anna', last: 'Maria Ferreira' })
+is('surname-first is un-inverted',
+  T.splitDisplayName('Cooper, Jane', 'j@x.com'), { first: 'Jane', last: 'Cooper' })
+is('one word is a first name', T.splitDisplayName('Kieran', 'k@x.com'), { first: 'Kieran', last: '' })
+is('no display name falls back to the local part',
+  T.splitDisplayName('', 'kieran.jessup@whittensgroup.com.au'), { first: 'Kieran', last: 'Jessup' })
+is('underscores work too', T.splitDisplayName('', 'kieran_jessup@x.com'), { first: 'Kieran', last: 'Jessup' })
+is('digits are dropped from a local part', T.splitDisplayName('', 'kieran.jessup2@x.com'),
+  { first: 'Kieran', last: 'Jessup' })
+is('an opaque local part is still a first name',
+  T.splitDisplayName('', 'info@x.com'), { first: 'Info', last: '' })
+is('nothing usable still yields a first name, because the column is NOT NULL',
+  T.splitDisplayName('', '').first.length > 0, true)
+
+// ---------- organisation name from a domain ----------
+is('the noise labels go', T.organisationNameFromDomain('whittensgroup.com.au'), 'Whittensgroup')
+is('a noise word standing alone as a label does go',
+  T.organisationNameFromDomain('whittens.group.au'), 'Whittens')
+is('a hyphen becomes a space', T.organisationNameFromDomain('blue-scope.com.au'), 'Blue Scope')
+is('a plain .com', T.organisationNameFromDomain('downer.com'), 'Downer')
+is('a subdomain is kept', T.organisationNameFromDomain('safety.downer.com'), 'Safety Downer')
+is('all-noise does not come back empty', T.organisationNameFromDomain('com.au'), 'Com')
+is('nothing at all', T.organisationNameFromDomain(''), '')
+
+// ---------- paths ----------
+is('the domain lookup is URL-safe',
+  T.urlSafe(T.contactsByDomainPath('whittensgroup.com.au')), true)
+is('it only asks for contacts that have an organisation',
+  T.contactsByDomainPath('x.com').includes('organisation_id=not.is.null'), true)
+is('the organisations list is ordered by name',
+  T.organisationsPath().includes('order=name'), true)
+
+// ---------- the picker's timezone ----------
+// 5pm on 27 August 2026 in Sydney is 07:00 UTC. The picker reports the wall
+// time as though it were UTC, so the offset has to come back off.
+const SYDNEY_OFFSET = 10 * 3600000
+is('a Sydney afternoon lands at the right instant',
+  T.dueAtFromPicker(Date.UTC(2026, 7, 27, 17, 0), SYDNEY_OFFSET), '2026-08-27T07:00:00.000Z')
+is('no offset leaves the value alone',
+  T.dueAtFromPicker(Date.UTC(2026, 7, 27, 17, 0), 0), '2026-08-27T17:00:00.000Z')
+is('a missing offset is treated as zero',
+  T.dueAtFromPicker(Date.UTC(2026, 7, 27, 17, 0), undefined), '2026-08-27T17:00:00.000Z')
+is('nothing picked is null', T.dueAtFromPicker(null, SYDNEY_OFFSET), null)
+is('an empty string is null, not 1970', T.dueAtFromPicker('', SYDNEY_OFFSET), null)
+is('undefined is null too', T.dueAtFromPicker(undefined, SYDNEY_OFFSET), null)
+is('rubbish is null', T.dueAtFromPicker('later', SYDNEY_OFFSET), null)
+
+// ---------- the rows ----------
+const newContact = T.contactRow({
+  firstName: 'Kieran', lastName: 'Jessup', role: 'National HSE Manager',
+  email: 'kieranjessup@whittensgroup.com.au', organisationId: 'o-1',
+})
+is('the contact carries what was typed',
+  [newContact.first_name, newContact.last_name, newContact.role, newContact.organisation_id],
+  ['Kieran', 'Jessup', 'National HSE Manager', 'o-1'])
+is('blank fields are null, not empty strings',
+  T.contactRow({ firstName: 'Kieran', lastName: '', role: '', email: '', organisationId: '' }),
+  { organisation_id: null, first_name: 'Kieran', last_name: null, role: null, email: null,
+    phone: null, notes: null })
+
+const newTask = T.taskRow(
+  { subject: 'Chase the KOMS decision', notes: '', dueAt: '2026-08-30T07:00:00.000Z',
+    nowIso: '2026-08-27T02:00:00.000Z' },
+  { contactId: 'c-1', organisationId: 'o-1', dealId: 'd-1', createdBy: 'u-1' },
+)
+is('a task is a task', newTask.type, 'task')
+is('due is when it is due', newTask.due_at, '2026-08-30T07:00:00.000Z')
+is('occurred_at is when it was raised', newTask.occurred_at, '2026-08-27T02:00:00.000Z')
+is('a task carries no gmail ids', [newTask.gmail_message_id, newTask.gmail_thread_id], [null, null])
+is('empty notes are null', newTask.notes, null)
+is('a task and a filed email agree about their columns',
+  Object.keys(newTask), Object.keys(row))
 
 // ---------- report ----------
 for (const f of failures) console.error(`  FAIL  ${f}`)

@@ -248,6 +248,7 @@ function activityRow(message, target) {
     subject: message.subject || null,
     notes: buildNote(message, message.body, BODY_EXCERPT_LIMIT),
     occurred_at: message.dateIso,
+    due_at: null,
     created_by: target.createdBy,
     gmail_message_id: message.id,
     gmail_thread_id: message.threadId || null,
@@ -308,4 +309,138 @@ function urlSafe(path) {
 function isDuplicateError(error) {
   var message = String(error && error.message ? error.message : error);
   return /^StudioDeals 409:/.test(message) || /23505|duplicate key value/i.test(message);
+}
+
+
+// ------------------------------------------------- creating people and work
+
+/** 'kieranjessup@whittensgroup.com.au' -> 'whittensgroup.com.au'. */
+function emailDomain(address) {
+  var at = String(address == null ? '' : address).lastIndexOf('@');
+  return at === -1 ? '' : String(address).slice(at + 1).trim().toLowerCase();
+}
+
+
+/**
+ * A first and last name for a new contact.
+ *
+ * Gmail's display name is the good source when there is one. When there is
+ * not, the local part usually still carries the name — kieran.jessup, or
+ * kieran_jessup — and a first name is required by crm.contacts, so something
+ * has to be found. Whatever this guesses, the card shows it in editable
+ * fields before anything is written.
+ */
+function splitDisplayName(name, email) {
+  var display = String(name == null ? '' : name).trim();
+
+  // "Cooper, Jane" is a surname-first display name, not two people.
+  var commaed = display.match(/^([^,]+),\s*(.+)$/);
+  if (commaed) return { first: commaed[2].trim(), last: commaed[1].trim() };
+
+  if (!display) {
+    var local = String(email == null ? '' : email).split('@')[0] || '';
+    display = local
+      .replace(/[._\-+]+/g, ' ')
+      .replace(/\d+/g, '')
+      .trim()
+      .replace(/\b[a-z]/g, function (c) {
+        return c.toUpperCase();
+      });
+  }
+
+  var parts = display.split(/\s+/).filter(Boolean);
+  if (!parts.length) return { first: String(email || 'Unknown'), last: '' };
+  if (parts.length === 1) return { first: parts[0], last: '' };
+  return { first: parts[0], last: parts.slice(1).join(' ') };
+}
+
+
+var DOMAIN_NOISE = ['com', 'net', 'org', 'gov', 'edu', 'co', 'au', 'nz', 'uk', 'group', 'mail'];
+
+/** 'whittensgroup.com.au' -> 'Whittensgroup', as a starting point the card
+ *  lets you edit. */
+function organisationNameFromDomain(domain) {
+  var labels = String(domain == null ? '' : domain).toLowerCase().split('.');
+
+  var kept = [];
+  for (var i = 0; i < labels.length; i++) {
+    if (DOMAIN_NOISE.indexOf(labels[i]) === -1 && labels[i]) kept.push(labels[i]);
+  }
+  if (!kept.length) kept = labels.slice(0, 1);
+
+  var words = kept.join(' ').split(/[-_\s]+/).filter(Boolean);
+  for (var j = 0; j < words.length; j++) {
+    words[j] = words[j].charAt(0).toUpperCase() + words[j].slice(1);
+  }
+  return words.join(' ');
+}
+
+
+function contactsByDomainPath(domain) {
+  return (
+    '/contacts?select=organisation_id,organisations(name)&organisation_id=not.is.null' +
+    '&email=ilike.*@' +
+    encodeURIComponent(domain) +
+    '&limit=200'
+  );
+}
+
+
+function organisationsPath() {
+  return '/organisations?select=id,name&order=name&limit=500';
+}
+
+
+/**
+ * When the date-time picker's value has to be read as an instant.
+ *
+ * The picker hands back milliseconds since epoch that ignore the timezone the
+ * person is standing in, and commonEventObject.timeZone.offset is what closes
+ * the gap. Get the sign wrong and a task due at 5pm lands at 3am, so the card
+ * that follows shows the time it settled on — the first task you set will say
+ * whether this is right.
+ */
+function dueAtFromPicker(msSinceEpoch, offsetMs) {
+  // Not `Number(x)` on its own: Number(null) and Number('') are both 0, and a
+  // task with no date picked would quietly land in January 1970.
+  if (msSinceEpoch == null || msSinceEpoch === '') return null;
+
+  var ms = Number(msSinceEpoch);
+  if (!isFinite(ms)) return null;
+  return new Date(ms - Number(offsetMs || 0)).toISOString();
+}
+
+
+/** The row a new contact becomes. */
+function contactRow(draft) {
+  return {
+    organisation_id: draft.organisationId || null,
+    first_name: draft.firstName,
+    last_name: draft.lastName || null,
+    role: draft.role || null,
+    email: draft.email || null,
+    phone: null,
+    notes: null,
+  };
+}
+
+
+/**
+ * The row a task becomes — the same shape createTask writes in the web app,
+ * so a task set from the sidebar is indistinguishable on /tasks.
+ */
+function taskRow(draft, target) {
+  return {
+    deal_id: target.dealId || null,
+    contact_id: target.contactId || null,
+    organisation_id: target.organisationId || null,
+    type: 'task',
+    subject: draft.subject || null,
+    notes: draft.notes || null,
+    occurred_at: draft.nowIso,
+    due_at: draft.dueAt,
+    created_by: target.createdBy,
+    gmail_message_id: null,
+    gmail_thread_id: null,
+  };
 }

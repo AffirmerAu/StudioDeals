@@ -13,7 +13,8 @@ Ticking **the whole thread** files every message in the conversation at once,
 skipping any already held — so after a reply arrives, filing again costs one
 row rather than the whole thread over again.
 
-Creating contacts and setting tasks come next.
+An unknown sender gets a **Create contact** card, and any known contact gets
+**Add task**.
 
 ## Prerequisites
 
@@ -154,3 +155,32 @@ Turn the flag off once it has answered.
 
 **`CONFIG.APP_BASE_URL` is blank.** Fill in the deployed web app's URL and the
 cards gain "Open in StudioDeals" links; leave it and they are omitted.
+
+## Creating a contact
+
+The name comes from Gmail's display name where there is one, and from the
+local part of the address where there is not — `kieran.jessup@` becomes Kieran
+Jessup, `Cooper, Jane` is un-inverted rather than read as two people. All of it
+lands in editable fields before anything is written, because
+`crm.contacts.first_name` is `NOT NULL` and a guess has to be correctable.
+
+The organisation dropdown puts domain matches first: if anyone already in
+StudioDeals has an address at that domain, the organisation is not a guess,
+and only that case is preselected. Every other organisation follows by name,
+so a client writing from a personal address is still one dropdown away. The
+last option creates one, named from the domain as a starting point.
+
+## Adding a task
+
+The same row the web app's `createTask` writes — `type` `task`, a `due_at`, and
+`occurred_at` set to when it was raised — so a task set from the sidebar is
+indistinguishable on `/tasks`. Tasks are excluded from
+`crm.recompute_last_contacted`, so setting a follow-up does not mark a client
+as recently contacted.
+
+**One thing to check on first use.** The date-time picker returns milliseconds
+that ignore the timezone the person is standing in, and
+`commonEventObject.timeZone.offset` is what closes the gap. Which direction
+that correction runs could not be tested from the build side, so the card that
+follows shows the time it settled on. If a task set for 5pm comes back saying
+3am, the sign is wrong in `dueAtFromPicker` and it is a one-character fix.

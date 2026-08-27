@@ -15,6 +15,7 @@ const files = readdirSync(addon).filter((f) => f.endsWith('.gs'))
 const sources = new Map(files.map((f) => [f, readFileSync(join(addon, f), 'utf8')]))
 const all = [...sources.values()].join('\n')
 const stripComments = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')
+const stripStrings = (src) => src.replace(/'(?:[^'\\\n]|\\.)*'/g, "''").replace(/"(?:[^"\\\n]|\\.)*"/g, '""')
 const code = stripComments(all)
 const manifest = JSON.parse(readFileSync(join(addon, 'appsscript.json'), 'utf8'))
 
@@ -52,12 +53,12 @@ const platform = new Set([
   'CardService', 'GmailApp', 'PropertiesService', 'CacheService', 'LockService',
   'Session', 'UrlFetchApp', 'Utilities', 'Logger', 'console',
   'JSON', 'Date', 'Math', 'Number', 'String', 'Object', 'Array', 'Error', 'Boolean',
-  'isNaN', 'parseInt', 'parseFloat', 'Function', 'RegExp', 'encodeURIComponent',
+  'isNaN', 'isFinite', 'parseInt', 'parseFloat', 'Function', 'RegExp', 'encodeURIComponent',
   'if', 'for', 'while', 'switch', 'catch', 'return', 'typeof', 'function', 'new',
 ])
 const unresolved = new Set()
 for (const [file, src] of sources) {
-  const body = stripComments(src)
+  const body = stripStrings(stripComments(src))
   for (const m of body.matchAll(/(^|[^.\w$'"])([A-Za-z_$][A-Za-z0-9_$]*)\s*\(/g)) {
     const name = m[2]
     if (!defined.has(name) && !platform.has(name)) unresolved.add(`${name} (${file})`)
@@ -111,8 +112,16 @@ check('no request path is assembled outside Text.gs', inlinePaths.length === 0,
 check('no URL is built with a double quote in it',
   !/'[^']*\?[^']*\\?"/.test(code) && !/in\.\(\s*'"'/.test(code))
 
-check('the only write path is /activities',
-  writes.every((p) => p === '/activities' || p.startsWith('/rpc/')), writes.join(', '))
+// The add-on may create people and the organisations they belong to, and log
+// activity. It must never write to deals: a deal's value and stage are the
+// web app's business, and nothing in a mail sidebar should move money.
+const WRITABLE = ['/activities', '/contacts', '/organisations']
+check('writes go only where they are meant to',
+  writes.every((p) => WRITABLE.indexOf(p) > -1 || p.startsWith('/rpc/')), writes.join(', '))
+check('nothing writes to deals',
+  !/apiFetch\(\s*'\/deals[^)]*method:\s*'(post|patch|put|delete)'/s.test(code))
+check('nothing writes to pipeline_stages',
+  !/apiFetch\(\s*'\/pipeline_stages[^)]*method:\s*'(post|patch|put|delete)'/s.test(code))
 check('every filed row carries its gmail_message_id',
   /gmail_message_id:\s*message\.id/.test(sources.get('Text.gs')))
 const saveHandler = sources.get('Code.gs').slice(

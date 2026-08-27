@@ -207,6 +207,194 @@ function describeTarget(target) {
 }
 
 
+/** The dropdown value that means "make one", rather than an id. */
+var NEW_ORGANISATION = '__new__';
+
+/** How far ahead a new task is dated before you change it. */
+var DEFAULT_DUE_DAYS = 3;
+
+
+/**
+ * The date-time picker's value, in whichever shape the platform sends.
+ *
+ * Its milliseconds ignore the timezone the person is standing in;
+ * dueAtFromPicker closes that gap with the offset the event carries.
+ */
+function dueAtValue(event) {
+  var common = event && event.commonEventObject;
+  var offset = (common && common.timeZone && common.timeZone.offset) || 0;
+
+  if (common && common.formInputs && common.formInputs.dueAt) {
+    var picked = common.formInputs.dueAt.dateTimeInput;
+    if (picked && picked.msSinceEpoch != null) {
+      return dueAtFromPicker(picked.msSinceEpoch, offset);
+    }
+  }
+  if (event && event.formInput && event.formInput.dueAt != null) {
+    return dueAtFromPicker(event.formInput.dueAt, offset);
+  }
+  return null;
+}
+
+
+// --------------------------------------------------------- create a contact
+
+function handleShowCreateContact(event) {
+  try {
+    var email = actionParam(event, 'email');
+    var domain = emailDomain(email);
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(
+        CardService.newNavigation().pushCard(
+          createContactCard({
+            email: email,
+            guess: splitDisplayName(actionParam(event, 'name'), email),
+            organisations: organisationChoices(domain),
+            suggestedOrganisation: organisationNameFromDomain(domain),
+          }),
+        ),
+      )
+      .build();
+  } catch (err) {
+    return replaceWith(err.name === 'AuthRequiredError' ? signInCard(err.message) : errorCard(err));
+  }
+}
+
+
+function handleCreateContact(event) {
+  try {
+    var firstName = String(formValue(event, 'firstName')).trim();
+    if (!firstName) {
+      return replaceWith(errorCard(new Error('A first name is required.')));
+    }
+
+    var chosen = String(formValue(event, 'organisationId') || '');
+    var organisationId = chosen === NEW_ORGANISATION ? '' : chosen;
+    var organisationName = '';
+
+    if (chosen === NEW_ORGANISATION) {
+      var newName = String(formValue(event, 'newOrganisationName')).trim();
+      if (!newName) {
+        return replaceWith(errorCard(new Error('Name the new organisation, or pick None.')));
+      }
+      var created = createOrganisationNamed(newName);
+      organisationId = created.id;
+      organisationName = created.name;
+    }
+
+    var contact = createContactRow(
+      contactRow({
+        firstName: firstName,
+        lastName: String(formValue(event, 'lastName')).trim(),
+        role: String(formValue(event, 'role')).trim(),
+        email: actionParam(event, 'email'),
+        organisationId: organisationId,
+      }),
+    );
+
+    var name = [contact.first_name, contact.last_name].filter(Boolean).join(' ');
+    return CardService.newActionResponseBuilder()
+      .setNavigation(
+        CardService.newNavigation().updateCard(
+          doneCard(
+            'Contact created',
+            [
+              { label: 'Name', value: name },
+              { label: 'Email', value: contact.email || '—' },
+              { label: 'Organisation', value: organisationName || 'From the list' },
+            ],
+            { label: 'Open in StudioDeals', path: '/contacts/' + contact.id },
+          ),
+        ),
+      )
+      .setNotification(CardService.newNotification().setText(name + ' added'))
+      .build();
+  } catch (err) {
+    return replaceWith(err.name === 'AuthRequiredError' ? signInCard(err.message) : errorCard(err));
+  }
+}
+
+
+// ------------------------------------------------------------- add a task
+
+function handleShowTask(event) {
+  try {
+    var contact = contactFor(actionParam(event, 'contactId'));
+    var message = readOpenMessage(event);
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(
+        CardService.newNavigation().pushCard(
+          taskCard({
+            contactId: contact.id,
+            organisationId: contact.organisation_id || '',
+            contactName: [contact.first_name, contact.last_name].filter(Boolean).join(' '),
+            // The subject you are looking at is nearly always what the task is
+            // about, and it is one tap to replace.
+            suggestedSubject: message.subject ? 'Follow up: ' + message.subject : 'Follow up',
+            defaultDueMs: Date.now() + DEFAULT_DUE_DAYS * 86400000,
+            deals: listOpenDeals(contact.organisation_id),
+          }),
+        ),
+      )
+      .build();
+  } catch (err) {
+    return replaceWith(err.name === 'AuthRequiredError' ? signInCard(err.message) : errorCard(err));
+  }
+}
+
+
+function handleAddTask(event) {
+  try {
+    var subject = String(formValue(event, 'subject')).trim();
+    if (!subject) return replaceWith(errorCard(new Error('Give the task a name.')));
+
+    var dueAt = dueAtValue(event);
+    if (!dueAt) return replaceWith(errorCard(new Error('Pick a date and time.')));
+
+    var target = {
+      contactId: actionParam(event, 'contactId'),
+      organisationId: actionParam(event, 'organisationId'),
+      dealId: String(formValue(event, 'dealId') || ''),
+      createdBy: currentUserId(),
+    };
+
+    createTaskRow(
+      taskRow(
+        {
+          subject: subject,
+          notes: String(formValue(event, 'notes')).trim(),
+          dueAt: dueAt,
+          nowIso: new Date().toISOString(),
+        },
+        target,
+      ),
+    );
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(
+        CardService.newNavigation().updateCard(
+          doneCard(
+            'Task added',
+            [
+              { label: 'Task', value: subject },
+              // Shown back deliberately: the picker's timezone handling is the
+              // one thing here that could not be tested before it shipped.
+              { label: 'Due', value: messageDateText(new Date(dueAt)) },
+            ],
+            { label: 'Open tasks', path: '/tasks' },
+          ),
+        ),
+      )
+      .setNotification(CardService.newNotification().setText('Task added'))
+      .build();
+  } catch (err) {
+    return replaceWith(err.name === 'AuthRequiredError' ? signInCard(err.message) : errorCard(err));
+  }
+}
+
+
 function handleSignOut(event) {
   signOut();
   return CardService.newActionResponseBuilder()
