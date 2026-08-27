@@ -97,13 +97,125 @@ function contactSection(contact, nowMs) {
     );
   }
 
+  var buttons = CardService.newButtonSet().addButton(
+    CardService.newTextButton()
+      .setText('File this email')
+      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+      .setOnClickAction(
+        CardService.newAction().setFunctionName('handleShowSave').setParameters({
+          contactId: contact.id,
+          organisationId: contact.organisation_id || '',
+        }),
+      ),
+  );
   if (CONFIG.APP_BASE_URL) {
-    section.addWidget(
-      CardService.newButtonSet().addButton(appLink('Open in StudioDeals', '/contacts/' + contact.id)),
+    buttons.addButton(appLink('Open in StudioDeals', '/contacts/' + contact.id));
+  }
+  section.addWidget(buttons);
+
+  return section;
+}
+
+
+// ------------------------------------------------------------------ filing
+
+/**
+ * Where to file it. The contact is settled by the time this card appears —
+ * the only open question is whether the email belongs to a deal.
+ */
+function saveCard(context) {
+  var contact = context.contact;
+  var name = [contact.first_name, contact.last_name].filter(Boolean).join(' ');
+
+  var picker = CardService.newSelectionInput()
+    .setType(CardService.SelectionInputType.DROPDOWN)
+    .setTitle('File against')
+    .setFieldName('dealId');
+
+  var deals = context.deals;
+  // One open deal is almost always the right answer, so it starts selected.
+  // Any other number and the contact alone is the safe default.
+  var only = deals.length === 1;
+  picker.addItem(name + ' only', '', !only);
+  for (var i = 0; i < deals.length; i++) {
+    picker.addItem(
+      deals[i].title + ' · ' + deals[i].stage_label + ' · ' + formatCents(deals[i].value_cents),
+      deals[i].id,
+      only,
     );
   }
 
-  return section;
+  var section = CardService.newCardSection()
+    .addWidget(
+      CardService.newDecoratedText()
+        .setTopLabel('Subject')
+        .setText(context.message.subject || '(no subject)')
+        .setWrapText(true),
+    )
+    .addWidget(
+      CardService.newDecoratedText().setTopLabel('Sent').setText(context.message.dateText),
+    )
+    .addWidget(picker);
+
+  if (!deals.length) {
+    section.addWidget(
+      CardService.newTextParagraph().setText(
+        'No open deals for ' + (contact.organisation_name || 'this organisation') + '.',
+      ),
+    );
+  }
+
+  section.addWidget(
+    CardService.newButtonSet().addButton(
+      CardService.newTextButton()
+        .setText('File it')
+        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setOnClickAction(
+          CardService.newAction().setFunctionName('handleSaveMessage').setParameters({
+            contactId: contact.id,
+            organisationId: contact.organisation_id || '',
+          }),
+        ),
+    ),
+  );
+
+  return brandedCard()
+    .setHeader(CardService.newCardHeader().setTitle('File this email').setSubtitle(name))
+    .addSection(section)
+    .build();
+}
+
+
+function saveResultCard(result) {
+  var section = CardService.newCardSection()
+    .addWidget(
+      CardService.newDecoratedText()
+        .setTopLabel(result.alreadyHeld ? 'Already filed' : 'Filed against')
+        .setText(result.target)
+        .setWrapText(true),
+    )
+    .addWidget(
+      CardService.newTextParagraph().setText(
+        result.alreadyHeld
+          ? 'StudioDeals already had this message, so nothing was written twice.'
+          : 'It is on the timeline now, dated when it was sent.',
+      ),
+    );
+
+  if (CONFIG.APP_BASE_URL && result.dealId) {
+    section.addWidget(
+      CardService.newButtonSet().addButton(appLink('Open the deal', '/deals/' + result.dealId)),
+    );
+  } else if (CONFIG.APP_BASE_URL && result.contactId) {
+    section.addWidget(
+      CardService.newButtonSet().addButton(appLink('Open the contact', '/contacts/' + result.contactId)),
+    );
+  }
+
+  return brandedCard()
+    .setHeader(CardService.newCardHeader().setTitle('StudioDeals'))
+    .addSection(section)
+    .build();
 }
 
 

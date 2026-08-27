@@ -15,7 +15,8 @@ const src = readFileSync(join(here, '..', 'Text.gs'), 'utf8')
 const T = new Function(
   src +
     '\nreturn { splitAddressList, parseAddress, parseAddressList, sameAddress,' +
-    ' pickCounterparty, displayNameFor, describeLastContacted, truncate };',
+    ' pickCounterparty, displayNameFor, describeLastContacted, truncate,' +
+    ' formatCents, isQuoteBoundary, cleanBody, buildNote };',
 )()
 
 let passed = 0
@@ -119,6 +120,71 @@ is('short text is left alone', T.truncate('hello', 10), 'hello')
 is('exactly the limit is left alone', T.truncate('hello', 5), 'hello')
 is('longer text gets an ellipsis', T.truncate('hello world', 8), 'hello w…')
 is('null truncates to nothing', T.truncate(null, 8), '')
+
+// ---------- money ----------
+is('whole thousands', T.formatCents(4200000), '$42,000')
+is('under a thousand', T.formatCents(85000), '$850')
+is('exactly a million', T.formatCents(100000000), '$1,000,000')
+is('zero', T.formatCents(0), '$0')
+is('cents round to the nearest dollar', T.formatCents(4249), '$42')
+is('and round up', T.formatCents(4250), '$43')
+is('negative', T.formatCents(-150000), '-$1,500')
+is('null is nothing, not NaN', T.formatCents(null), '$0')
+
+// ---------- quoted history ----------
+is('a Gmail attribution ends the body', T.isQuoteBoundary('On Mon, 24 Aug 2026 at 17:06, Kieran Jessup <k@w.com.au> wrote:', ''), true)
+is('a wrapped attribution ends it too', T.isQuoteBoundary('On Mon, 24 Aug 2026 at 17:06, Kieran Jessup', '<kieran@whittensgroup.com.au> wrote:'), true)
+is('an Outlook original-message rule', T.isQuoteBoundary('-----Original Message-----', ''), true)
+is('an Outlook divider', T.isQuoteBoundary('________________________________', ''), true)
+is('a forwarded header needs its second line', T.isQuoteBoundary('From: Kieran Jessup', 'Sent: Monday, 24 August 2026'), true)
+is('a bare From: line in prose does not', T.isQuoteBoundary('From: the top of the scaffold, you can see...', 'the whole site.'), false)
+is('ordinary prose starting with On does not', T.isQuoteBoundary('On site next Tuesday, we will need three cameras.', 'Let me know.'), false)
+
+is(
+  'quoted lines are dropped and the history is cut',
+  T.cleanBody(
+    'Thanks Matt, that works.\n\nKieran\n\nOn Mon, 24 Aug 2026 at 09:00, Matt <matt@affirmer.com.au> wrote:\n> Are you free Thursday?\n> Matt',
+  ),
+  'Thanks Matt, that works.\n\nKieran',
+)
+is('runs of blank lines collapse', T.cleanBody('One\n\n\n\n\nTwo'), 'One\n\nTwo')
+is('CRLF is normalised', T.cleanBody('One\r\nTwo\r\n'), 'One\nTwo')
+is('surrounding whitespace goes, both ends', T.cleanBody('  Hello   \n   '), 'Hello')
+is('an empty body stays empty', T.cleanBody(''), '')
+is('a body that is only quoted history is empty', T.cleanBody('> everything\n> was quoted'), '')
+
+// ---------- the note ----------
+const HEADERS = {
+  from: 'Kieran Jessup <KieranJessup@whittensgroup.com.au>',
+  to: 'matt@affirmer.com.au',
+  cc: '',
+  dateText: '24 Aug 2026, 5:06 pm',
+}
+is(
+  'headers then a blank line then the excerpt',
+  T.buildNote(HEADERS, 'Happy with the storyboard.', 500),
+  'From: Kieran Jessup <KieranJessup@whittensgroup.com.au>\nTo: matt@affirmer.com.au\nDate: 24 Aug 2026, 5:06 pm\n\nHappy with the storyboard.',
+)
+is(
+  'an empty Cc is omitted rather than left blank',
+  T.buildNote(HEADERS, '', 500).includes('Cc:'),
+  false,
+)
+is(
+  'a Cc is kept when there is one',
+  T.buildNote({ ...HEADERS, cc: 'james@affirmer.com.au' }, 'x', 500).includes('Cc: james@affirmer.com.au'),
+  true,
+)
+is(
+  'a long body is truncated with an ellipsis',
+  T.buildNote(HEADERS, 'x'.repeat(600), 500).endsWith('x…'),
+  true,
+)
+is(
+  'a body with nothing left after cleaning leaves headers alone',
+  T.buildNote(HEADERS, '> only quotes', 500),
+  'From: Kieran Jessup <KieranJessup@whittensgroup.com.au>\nTo: matt@affirmer.com.au\nDate: 24 Aug 2026, 5:06 pm',
+)
 
 // ---------- report ----------
 for (const f of failures) console.error(`  FAIL  ${f}`)

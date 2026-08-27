@@ -84,3 +84,105 @@ function apiRpc(functionName, args) {
 function findContactsByEmail(address) {
   return apiRpc('find_contacts_by_email', { addr: address }) || [];
 }
+
+
+/**
+ * The six pipeline stages, cached for the day.
+ *
+ * Read from crm.pipeline_stages and ordered by position, never hardcoded —
+ * the same rule the web app follows. What counts as an open deal is whatever
+ * the table says is neither won nor lost.
+ */
+var STAGES_CACHE_KEY = 'crm_stages';
+
+function listStages() {
+  var cache = CacheService.getUserCache();
+  var cached = cache.get(STAGES_CACHE_KEY);
+  if (cached) return JSON.parse(cached);
+
+  var stages = apiFetch('/pipeline_stages?select=id,label,position,is_won,is_lost&order=position', {});
+  cache.put(STAGES_CACHE_KEY, JSON.stringify(stages), 21600);
+  return stages;
+}
+
+
+function stageById(stages, id) {
+  for (var i = 0; i < stages.length; i++) {
+    if (stages[i].id === id) return stages[i];
+  }
+  return null;
+}
+
+
+/**
+ * An organisation's open deals, in board order.
+ *
+ * The filtering happens here rather than in the query because "open" is a
+ * property of the stage, not the deal — expressing it in PostgREST would mean
+ * an inner embed and a filter on the embedded table, for a list that is never
+ * more than a handful of rows.
+ */
+function listOpenDeals(organisationId) {
+  if (!organisationId) return [];
+
+  var deals = apiFetch(
+    '/deals?select=id,title,value_cents,stage_id&organisation_id=eq.' +
+      encodeURIComponent(organisationId) +
+      '&order=board_position',
+    {},
+  );
+  var stages = listStages();
+
+  var open = [];
+  for (var i = 0; i < deals.length; i++) {
+    var stage = stageById(stages, deals[i].stage_id);
+    if (stage && !stage.is_won && !stage.is_lost) {
+      deals[i].stage_label = stage.label;
+      open.push(deals[i]);
+    }
+  }
+  return open;
+}
+
+
+/**
+ * Which of these Gmail messages StudioDeals already holds.
+ *
+ * The structural characters of the `in.` list stay raw while each id is
+ * encoded on its own, so a thread id like `thread-f:1874387461069433417`
+ * survives the trip without its colon breaking the filter.
+ *
+ * Reading before writing, rather than leaning on the unique index and
+ * PostgREST's duplicate resolution: the index is partial, and a partial index
+ * as a conflict target is exactly the combination this project has been
+ * bitten by before. It also lets the card say "1 filed, 2 already held".
+ */
+function findSavedMessageIds(messageIds) {
+  if (!messageIds.length) return {};
+
+  var quoted = [];
+  for (var i = 0; i < messageIds.length; i++) {
+    quoted.push('"' + encodeURIComponent(messageIds[i]) + '"');
+  }
+
+  var rows = apiFetch(
+    '/activities?select=gmail_message_id&gmail_message_id=in.(' + quoted.join(',') + ')',
+    {},
+  );
+
+  var held = {};
+  for (var j = 0; j < rows.length; j++) held[rows[j].gmail_message_id] = true;
+  return held;
+}
+
+
+/** Writes the activity rows. Every object carries the same keys, because
+ *  PostgREST rejects an array whose members disagree about their shape. */
+function insertActivities(rows) {
+  if (!rows.length) return [];
+  return apiFetch('/activities', {
+    method: 'post',
+    payload: rows,
+    prefer: 'return=representation',
+  });
+}

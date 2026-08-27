@@ -52,7 +52,7 @@ const platform = new Set([
   'CardService', 'GmailApp', 'PropertiesService', 'CacheService', 'LockService',
   'Session', 'UrlFetchApp', 'Utilities', 'Logger', 'console',
   'JSON', 'Date', 'Math', 'Number', 'String', 'Object', 'Array', 'Error', 'Boolean',
-  'isNaN', 'parseInt', 'parseFloat', 'Function', 'RegExp',
+  'isNaN', 'parseInt', 'parseFloat', 'Function', 'RegExp', 'encodeURIComponent',
   'if', 'for', 'while', 'switch', 'catch', 'return', 'typeof', 'function', 'new',
 ])
 const unresolved = new Set()
@@ -98,10 +98,22 @@ check('the message scope is the narrow one',
   manifest.oauthScopes.includes('https://www.googleapis.com/auth/gmail.addons.current.message.readonly') &&
   !manifest.oauthScopes.some((s) => s.endsWith('/auth/gmail.readonly')),
   JSON.stringify(manifest.oauthScopes))
-check('nothing writes to StudioDeals yet',
-  !/method:\s*'(post|patch|put|delete)'/.test(sources.get('Api.gs').replace(/rpc/g, '')) ||
-  !/apiFetch\('\/(?!rpc)/.test(all),
-  'a write path appeared before its step')
+// Filing emails is step 3, so writes exist now. What must stay true is that
+// the only table written to is activities, and that every row carries the id
+// that makes a second Save a no-op rather than a duplicate.
+const writes = [...sources.get('Api.gs').matchAll(/apiFetch\(\s*'([^']+)'[^)]*method:\s*'post'/gs)]
+  .map((m) => m[1].split('?')[0])
+check('the only write path is /activities',
+  writes.every((p) => p === '/activities' || p.startsWith('/rpc/')), writes.join(', '))
+check('every filed row carries its gmail_message_id',
+  /gmail_message_id:\s*message\.id/.test(sources.get('Code.gs')))
+check('filing reads before it writes',
+  sources.get('Code.gs').indexOf('findSavedMessageIds') <
+    sources.get('Code.gs').indexOf('insertActivities'))
+check('occurred_at is the message date, never now()',
+  /occurred_at:\s*message\.dateIso/.test(sources.get('Code.gs')))
+check('money is never parsed out of a string',
+  !/parseFloat|Number\(.*\$/.test(sources.get('Text.gs')))
 
 for (const f of failures) console.error(`  FAIL  ${f}`)
 console.log(`${passed} passed, ${failures.length} failed`)

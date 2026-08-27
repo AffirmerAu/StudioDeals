@@ -12,6 +12,8 @@ function readOpenMessage(event) {
   GmailApp.setCurrentMessageAccessToken(event.gmail.accessToken);
   var message = GmailApp.getMessageById(event.gmail.messageId);
 
+  var date = message.getDate();
+
   return {
     id: event.gmail.messageId,
     threadId: event.gmail.threadId,
@@ -19,8 +21,27 @@ function readOpenMessage(event) {
     from: message.getFrom(),
     to: message.getTo(),
     cc: message.getCc(),
-    date: message.getDate(),
+    date: date,
+    dateIso: date.toISOString(),
+    dateText: messageDateText(date),
   };
+}
+
+
+/** The script timezone comes from appsscript.json, so this reads as Sydney
+ *  time whichever machine pushed it. */
+function messageDateText(date) {
+  return Utilities.formatDate(date, Session.getScriptTimeZone(), 'd MMM yyyy, h:mm a');
+}
+
+
+/**
+ * The body, fetched only when something is about to be filed. Every message
+ * open would otherwise pay for text no card displays.
+ */
+function readMessageBody(event) {
+  GmailApp.setCurrentMessageAccessToken(event.gmail.accessToken);
+  return GmailApp.getMessageById(event.gmail.messageId).getPlainBody();
 }
 
 

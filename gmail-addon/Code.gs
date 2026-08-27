@@ -100,6 +100,108 @@ function handleSignIn(event) {
 }
 
 
+/** An action parameter, from either shape the platform might hand us. */
+function actionParam(event, name) {
+  var common = event && event.commonEventObject;
+  if (common && common.parameters && common.parameters[name] != null) return common.parameters[name];
+  if (event && event.parameters && event.parameters[name] != null) return event.parameters[name];
+  return '';
+}
+
+
+/** How much of the body goes into the note. Context, not an archive. */
+var BODY_EXCERPT_LIMIT = 500;
+
+
+/** The one contact this address resolves to, re-read rather than carried
+ *  across the action so the card never files against a stale record. */
+function contactFor(contactId) {
+  var rows = apiFetch(
+    '/v_contacts_list?select=*&id=eq.' + encodeURIComponent(contactId) + '&limit=1',
+    {},
+  );
+  if (!rows.length) throw new Error('That contact is no longer in StudioDeals.');
+  return rows[0];
+}
+
+
+function handleShowSave(event) {
+  try {
+    var contact = contactFor(actionParam(event, 'contactId'));
+    return CardService.newActionResponseBuilder()
+      .setNavigation(
+        CardService.newNavigation().pushCard(
+          saveCard({
+            message: readOpenMessage(event),
+            contact: contact,
+            deals: listOpenDeals(contact.organisation_id),
+          }),
+        ),
+      )
+      .build();
+  } catch (err) {
+    return replaceWith(err.name === 'AuthRequiredError' ? signInCard(err.message) : errorCard(err));
+  }
+}
+
+
+function handleSaveMessage(event) {
+  try {
+    var contactId = actionParam(event, 'contactId');
+    var organisationId = actionParam(event, 'organisationId');
+    var dealId = String(formValue(event, 'dealId') || '');
+
+    var message = readOpenMessage(event);
+    var held = findSavedMessageIds([message.id]);
+
+    var target;
+    if (dealId) {
+      var deals = listOpenDeals(organisationId);
+      target = 'the deal';
+      for (var i = 0; i < deals.length; i++) {
+        if (deals[i].id === dealId) target = deals[i].title;
+      }
+    } else {
+      var contact = contactFor(contactId);
+      target = [contact.first_name, contact.last_name].filter(Boolean).join(' ');
+    }
+
+    if (!held[message.id]) {
+      insertActivities([
+        {
+          deal_id: dealId || null,
+          contact_id: contactId,
+          organisation_id: organisationId || null,
+          type: 'email',
+          subject: message.subject || null,
+          notes: buildNote(message, readMessageBody(event), BODY_EXCERPT_LIMIT),
+          occurred_at: message.dateIso,
+          created_by: currentUserId(),
+          gmail_message_id: message.id,
+          gmail_thread_id: message.threadId || null,
+        },
+      ]);
+    }
+
+    var result = {
+      alreadyHeld: !!held[message.id],
+      target: target,
+      dealId: dealId,
+      contactId: contactId,
+    };
+
+    return CardService.newActionResponseBuilder()
+      .setNavigation(CardService.newNavigation().updateCard(saveResultCard(result)))
+      .setNotification(
+        CardService.newNotification().setText(result.alreadyHeld ? 'Already filed' : 'Filed'),
+      )
+      .build();
+  } catch (err) {
+    return replaceWith(err.name === 'AuthRequiredError' ? signInCard(err.message) : errorCard(err));
+  }
+}
+
+
 function handleSignOut(event) {
   signOut();
   return CardService.newActionResponseBuilder()

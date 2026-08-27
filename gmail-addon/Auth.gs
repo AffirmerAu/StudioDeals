@@ -141,3 +141,28 @@ function getAccessToken(forceRefresh) {
     lock.releaseLock();
   }
 }
+
+
+/**
+ * The Supabase user id, read out of the access token's `sub` claim.
+ *
+ * crm.activities.created_by records who logged an activity, and the web app
+ * fills it in from the signed-in user — so the add-on has to as well, or half
+ * the timeline forgets who wrote it. The claim is already in hand; asking
+ * /auth/v1/user for it would be a round trip for something we are holding.
+ */
+function currentUserId() {
+  var token = getAccessToken(false);
+  var parts = String(token).split('.');
+  if (parts.length !== 3) return null;
+
+  try {
+    var bytes = Utilities.base64DecodeWebSafe(parts[1]);
+    var claims = JSON.parse(Utilities.newBlob(bytes).getDataAsString('UTF-8'));
+    return claims.sub || null;
+  } catch (ignored) {
+    // A token we cannot read is still a token Supabase accepts. Log the
+    // activity without an author rather than refusing to log it.
+    return null;
+  }
+}

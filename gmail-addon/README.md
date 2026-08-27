@@ -4,9 +4,12 @@ A Google Workspace add-on. Open an email and the sidebar tells you who the
 sender is in StudioDeals — their organisation, when you last spoke, whether
 they are going cold.
 
-This is step 2 of the build: the skeleton, auth, and one read-only card.
-Nothing here writes to StudioDeals. Filing emails, creating contacts and
-setting tasks come next.
+Filing an email writes one `crm.activities` row against a deal, or against
+the contact alone — dated when the message was sent, carrying enough of the
+body to recognise it later, and with the Gmail ids that make a second File It
+a no-op instead of a duplicate.
+
+Creating contacts, setting tasks, and saving a whole thread come next.
 
 ## Prerequisites
 
@@ -72,8 +75,8 @@ this README local.
 
 ## Tests
 
-    node gmail-addon/tests/text.test.mjs      # address parsing, dates
-    node gmail-addon/tests/wiring.test.mjs    # names, manifest, scopes
+    node gmail-addon/tests/text.test.mjs      # addresses, dates, money, quoted history
+    node gmail-addon/tests/wiring.test.mjs    # names, manifest, scopes, write invariants
 
 `wiring.test.mjs` earns its place because Apps Script resolves everything by
 name at runtime: a function named in the manifest or in `setFunctionName` that
@@ -83,6 +86,25 @@ no service-role key, no write paths before their step.
 
 Neither test can reach CardService, the trigger event, or Supabase. Card
 layout and the OAuth grant get found on deploy.
+
+What the insert itself does get tested against is a real PostgreSQL 16 cluster
+built from `migrations/`, using the exact column list read out of `Code.gs` —
+so a typo there is a failure here rather than a 400 in the sidebar.
+
+## Filing an email
+
+One row per message, and never a second for the same one. Before writing,
+the add-on asks StudioDeals which of the message ids it already holds; the
+partial unique index on `gmail_message_id` is the backstop, not the mechanism.
+
+`occurred_at` is the message's own date, so an email filed a week late lands
+in the right place on the timeline rather than at the top of it. `type` is
+`email`, which `crm.sync_last_contacted` counts as real contact — filing
+refreshes the contact and clears the stale flag.
+
+The note is `From` / `To` / `Cc` / `Date`, a blank line, and the first 500
+characters of the body with quoted history removed. Context, not an archive:
+the email stays in Gmail and the row carries the ids that lead back to it.
 
 ## Things worth knowing
 

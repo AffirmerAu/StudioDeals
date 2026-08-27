@@ -145,3 +145,79 @@ function truncate(text, limit) {
   var s = String(text == null ? '' : text);
   return s.length <= limit ? s : s.slice(0, limit - 1) + '…';
 }
+
+
+/**
+ * Cents to "$42,000", the same shape the web app shows.
+ *
+ * Hand-rolled rather than Intl.NumberFormat, for two reasons: it stays
+ * testable under Node with no dependence on which ICU data Apps Script
+ * happens to ship, and money in this project is integer cents that must never
+ * become a float on the way to a screen. Whole dollars only — en-AU renders
+ * AUD with a bare $, so this matches formatCents in src/lib/format.ts.
+ */
+function formatCents(cents) {
+  var value = Math.round(Number(cents || 0) / 100);
+  var sign = value < 0 ? '-' : '';
+  var digits = String(Math.abs(value));
+  var grouped = '';
+  for (var i = 0; i < digits.length; i++) {
+    if (i > 0 && (digits.length - i) % 3 === 0) grouped += ',';
+    grouped += digits.charAt(i);
+  }
+  return sign + '$' + grouped;
+}
+
+
+/**
+ * True where the quoted history starts. Everything from here down is the
+ * conversation the CRM already has, or is about to get from its own row.
+ */
+function isQuoteBoundary(line, next) {
+  var following = String(next == null ? '' : next);
+
+  if (/^\s*-{2,}\s*Original Message\s*-{2,}\s*$/i.test(line)) return true;
+  if (/^\s*_{10,}\s*$/.test(line)) return true;
+  if (/^\s*On\b.*\bwrote:\s*$/.test(line)) return true;
+
+  // Gmail wraps a long attribution over two lines.
+  if (/^\s*On\b/.test(line) && /\bwrote:\s*$/.test(following)) return true;
+
+  // Outlook's forwarded header. Paired with the line below it, because a bare
+  // "From:" appears in plenty of legitimate prose.
+  if (/^\s*From:\s*\S/.test(line) && /^\s*(Sent|Date):\s*\S/.test(following)) return true;
+
+  return false;
+}
+
+
+/** The readable part of a plain-text body: no quoted history, no ragged
+ *  whitespace. */
+function cleanBody(raw) {
+  var lines = String(raw == null ? '' : raw).replace(/\r\n?/g, '\n').split('\n');
+  var kept = [];
+
+  for (var i = 0; i < lines.length; i++) {
+    if (isQuoteBoundary(lines[i], lines[i + 1])) break;
+    if (/^\s*>/.test(lines[i])) continue;
+    kept.push(lines[i].replace(/\s+$/, ''));
+  }
+
+  return kept.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+
+/**
+ * The activity note: who, when, and enough of what to recognise the thread a
+ * year later. Not an archive — the email itself stays in Gmail, and the row
+ * carries the ids that lead back to it.
+ */
+function buildNote(headers, body, limit) {
+  var lines = ['From: ' + (headers.from || '—')];
+  if (headers.to) lines.push('To: ' + headers.to);
+  if (headers.cc) lines.push('Cc: ' + headers.cc);
+  if (headers.dateText) lines.push('Date: ' + headers.dateText);
+
+  var excerpt = truncate(cleanBody(body), limit);
+  return excerpt ? lines.join('\n') + '\n\n' + excerpt : lines.join('\n');
+}
