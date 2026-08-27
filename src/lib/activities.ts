@@ -155,16 +155,48 @@ export async function setActivityCompleted(
 
 // ------------------------------------------------------------------- tasks
 
+/** Which record a task hangs off. A deal knows its organisation and contact,
+ *  so those come along; the other two stand alone. */
+export type TaskTarget =
+  | { kind: 'deal'; id: string; organisationId: string | null; contactId: string | null }
+  | { kind: 'contact'; id: string; organisationId: string | null }
+  | { kind: 'organisation'; id: string }
+
+const TASK_TARGET_COLUMN = {
+  deal: 'deal_id',
+  contact: 'contact_id',
+  organisation: 'organisation_id',
+} as const
+
+/** The FKs a task raised against this record should carry. */
+export function taskTargetKeys(target: TaskTarget): {
+  deal_id: string | null
+  contact_id: string | null
+  organisation_id: string | null
+} {
+  if (target.kind === 'deal') {
+    return { deal_id: target.id, contact_id: target.contactId, organisation_id: target.organisationId }
+  }
+  if (target.kind === 'contact') {
+    return { deal_id: null, contact_id: target.id, organisation_id: target.organisationId }
+  }
+  return { deal_id: null, contact_id: null, organisation_id: target.id }
+}
+
 /**
  * Everything outstanding on a record: standalone tasks, and follow-ups hung
  * off a call or a quote. Both are work owed, and the dashboard has always
  * treated them the same way. Soonest first, so overdue leads.
+ *
+ * An organisation's list deliberately does not gather up its contacts' and
+ * deals' tasks — those have their own pages, and rolling them up here would
+ * make it impossible to tell what is owed to the organisation itself.
  */
-export async function listOpenTasksFor(dealId: string): Promise<TimelineActivityRow[]> {
+export async function listOpenTasksFor(target: TaskTarget): Promise<TimelineActivityRow[]> {
   const { data, error } = await supabase
     .from('activities')
     .select(TIMELINE_SELECT)
-    .eq('deal_id', dealId)
+    .eq(TASK_TARGET_COLUMN[target.kind], target.id)
     .not('due_at', 'is', null)
     .is('completed_at', null)
     .order('due_at', { ascending: true })
@@ -177,9 +209,7 @@ export interface TaskDraft {
   subject: string
   dueAt: string
   notes: string | null
-  dealId: string
-  organisationId: string | null
-  contactId: string | null
+  target: TaskTarget
 }
 
 /**
@@ -195,9 +225,7 @@ export async function createTask(draft: TaskDraft, createdBy: string | null): Pr
       notes: draft.notes?.trim() || null,
       occurred_at: new Date().toISOString(),
       due_at: draft.dueAt,
-      deal_id: draft.dealId,
-      organisation_id: draft.organisationId,
-      contact_id: draft.contactId,
+      ...taskTargetKeys(draft.target),
     },
     createdBy,
   )

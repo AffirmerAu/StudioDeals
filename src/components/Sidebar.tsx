@@ -9,6 +9,7 @@ import {
   MoonIcon,
   OrganisationsIcon,
   PipelineIcon,
+  ReportsIcon,
   SignOutIcon,
   SunIcon,
   TasksIcon,
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { to: '/tasks', label: 'Tasks', icon: TasksIcon, end: false },
   { to: '/contacts', label: 'Contacts', icon: ContactsIcon, end: false },
   { to: '/organisations', label: 'Organisations', icon: OrganisationsIcon, end: false },
+  { to: '/reports', label: 'Reports', icon: ReportsIcon, end: false },
 ] as const
 
 function navLinkStyle(isActive: boolean): CSSProperties {
@@ -96,7 +98,7 @@ export function Sidebar() {
 
       {/* Mobile bottom bar */}
       <nav
-        className="md:hidden fixed inset-x-0 bottom-0 z-10 flex items-center border-t"
+        className="md:hidden fixed inset-x-0 bottom-0 z-10 flex items-center overflow-x-auto border-t"
         style={{ borderColor: 'var(--border)', background: 'var(--surface-raised)' }}
       >
         {NAV_ITEMS.map(({ to, label, icon: ItemIcon, end }) => (
@@ -104,7 +106,7 @@ export function Sidebar() {
             key={to}
             to={to}
             end={end}
-            className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors duration-150"
+            className="flex min-w-16 flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors duration-150"
             style={({ isActive }) => navLinkStyle(isActive)}
           >
             <ItemIcon className="size-5" />
@@ -115,7 +117,7 @@ export function Sidebar() {
         <button
           type="button"
           onClick={() => void signOut()}
-          className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors duration-150"
+          className="flex min-w-16 flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors duration-150"
           style={{ color: 'var(--text-muted)' }}
         >
           <SignOutIcon className="size-5" />
@@ -131,7 +133,7 @@ function ThemeToggleButton({ theme, onToggle }: { theme: Theme; onToggle: () => 
     <button
       type="button"
       onClick={onToggle}
-      className="flex-1 flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors duration-150"
+      className="flex min-w-16 flex-1 flex-col items-center gap-1 py-2.5 text-[11px] font-medium transition-colors duration-150"
       style={{ color: 'var(--text-muted)' }}
     >
       {theme === 'dark' ? <SunIcon className="size-5" /> : <MoonIcon className="size-5" />}

@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { organisationIdsForTag } from '@/lib/tags'
 import type { OrganisationRow, OrganisationSummaryRow } from '@/types/crm'
 
 export const ORGANISATIONS_PAGE_SIZE = 50
@@ -13,6 +14,7 @@ export type OrganisationSortColumn =
 export interface ListOrganisationsParams {
   search: string
   industry: string | null
+  tagId: number | null
   showAll: boolean
   sortColumn: OrganisationSortColumn
   ascending: boolean
@@ -25,7 +27,7 @@ export interface ListOrganisationsResult {
 }
 
 export async function listOrganisations(params: ListOrganisationsParams): Promise<ListOrganisationsResult> {
-  const { search, industry, showAll, sortColumn, ascending, page } = params
+  const { search, industry, tagId, showAll, sortColumn, ascending, page } = params
   const from = page * ORGANISATIONS_PAGE_SIZE
   const to = from + ORGANISATIONS_PAGE_SIZE - 1
 
@@ -33,6 +35,14 @@ export async function listOrganisations(params: ListOrganisationsParams): Promis
 
   if (!showAll) query = query.eq('is_client', true)
   if (industry) query = query.eq('industry', industry)
+
+  // Same two-step as the contacts list: taggings can't be filtered through an
+  // embed here, so the ids are resolved first and folded in as an `in`.
+  if (tagId !== null) {
+    const ids = await organisationIdsForTag(tagId)
+    if (ids.length === 0) return { rows: [], total: 0 }
+    query = query.in('id', ids)
+  }
   if (search.trim()) query = query.ilike('name', `%${search.trim()}%`)
 
   query = query.order(sortColumn, { ascending }).range(from, to)

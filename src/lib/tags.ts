@@ -150,10 +150,18 @@ export async function detachTag(target: TagTarget, tagId: number): Promise<void>
 }
 
 export async function contactIdsForTag(tagId: number): Promise<string[]> {
-  const { data, error } = await supabase.from('taggings').select('contact_id').eq('tag_id', tagId)
+  return idsForTag(tagId, 'contact_id')
+}
+
+export async function organisationIdsForTag(tagId: number): Promise<string[]> {
+  return idsForTag(tagId, 'organisation_id')
+}
+
+async function idsForTag(tagId: number, column: 'contact_id' | 'organisation_id'): Promise<string[]> {
+  const { data, error } = await supabase.from('taggings').select(column).eq('tag_id', tagId)
 
   if (error) throw error
   return (data ?? [])
-    .map((row) => row.contact_id)
+    .map((row) => (row as Record<string, string | null>)[column])
     .filter((id): id is string => id !== null)
 }

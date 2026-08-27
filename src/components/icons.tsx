@@ -107,3 +107,11 @@ export function TasksIcon(props: SVGProps<SVGSVGElement>) {
     </Icon>
   )
 }
+
+export function ReportsIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <Icon {...props}>
+      <path d="M3 16.5V9M8 16.5V4.5M13 16.5v-5M18 16.5V7" />
+    </Icon>
+  )
+}

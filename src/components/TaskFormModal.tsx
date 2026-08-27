@@ -3,13 +3,11 @@ import { Modal } from '@/components/Modal'
 import { Field, inputClass, inputStyle } from '@/components/form'
 import { useAuth } from '@/lib/auth-context'
 import { useToast } from '@/lib/toast-context'
-import { createTask, updateActivity, type TimelineActivityRow } from '@/lib/activities'
+import { createTask, updateActivity, type TaskTarget, type TimelineActivityRow } from '@/lib/activities'
 
 interface TaskFormModalProps {
   open: boolean
-  dealId: string
-  organisationId: string | null
-  contactId: string | null
+  target: TaskTarget
   /** Set to edit an existing task rather than raise a new one. */
   task?: TimelineActivityRow | null
   onClose: () => void
@@ -47,15 +45,7 @@ function nextMondayNineAm(from = new Date()): string {
   return atNineAm(daysUntilMonday, from)
 }
 
-export function TaskFormModal({
-  open,
-  dealId,
-  organisationId,
-  contactId,
-  task,
-  onClose,
-  onSaved,
-}: TaskFormModalProps) {
+export function TaskFormModal({ open, target, task, onClose, onSaved }: TaskFormModalProps) {
   const { session } = useAuth()
   const { showToast } = useToast()
   const [subject, setSubject] = useState('')
@@ -98,10 +88,7 @@ export function TaskFormModal({
             organisation_id: task.organisation_id,
             contact_id: task.contact_id,
           })
-        : await createTask(
-            { subject, dueAt: due, notes, dealId, organisationId, contactId },
-            session?.user.id ?? null,
-          )
+        : await createTask({ subject, dueAt: due, notes, target }, session?.user.id ?? null)
       showToast(task ? 'Task updated' : 'Task added')
       onSaved(saved)
     } catch (error) {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { EmptyState } from '@/components/EmptyState'
 import { SkeletonBlock } from '@/components/Skeleton'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
-import { TaskFormModal } from '@/components/deals/TaskFormModal'
+import { TaskFormModal } from '@/components/TaskFormModal'
 import { formatDateTime } from '@/lib/format'
 import { useToast } from '@/lib/toast-context'
 import {
@@ -11,18 +11,17 @@ import {
   isOverdue,
   listOpenTasksFor,
   setActivityCompleted,
+  type TaskTarget,
   type TimelineActivityRow,
 } from '@/lib/activities'
 
-interface DealTasksProps {
-  dealId: string
-  organisationId: string | null
-  contactId: string | null
+interface RecordTasksProps {
+  target: TaskTarget
   /** Bumped when a task is completed, so the history reloads and shows it. */
   onCompleted: () => void
 }
 
-export function DealTasks({ dealId, organisationId, contactId, onCompleted }: DealTasksProps) {
+export function RecordTasks({ target, onCompleted }: RecordTasksProps) {
   const { showToast } = useToast()
   const [rows, setRows] = useState<TimelineActivityRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -34,7 +33,7 @@ export function DealTasks({ dealId, organisationId, contactId, onCompleted }: De
 
   useEffect(() => {
     let cancelled = false
-    listOpenTasksFor(dealId)
+    listOpenTasksFor(target)
       .then((result) => {
         if (!cancelled) setRows(result)
       })
@@ -48,7 +47,7 @@ export function DealTasks({ dealId, organisationId, contactId, onCompleted }: De
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dealId])
+  }, [target.kind, target.id])
 
   const complete = async (row: TimelineActivityRow) => {
     setBusyId(row.id)
@@ -195,9 +194,7 @@ export function DealTasks({ dealId, organisationId, contactId, onCompleted }: De
 
       <TaskFormModal
         open={formOpen}
-        dealId={dealId}
-        organisationId={organisationId}
-        contactId={contactId}
+        target={target}
         task={editing}
         onClose={() => setFormOpen(false)}
         onSaved={(saved) => {

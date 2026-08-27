@@ -10,6 +10,7 @@ import type { OrganisationSummaryRow } from '@/types/crm'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 import { formatCents } from '@/lib/format'
 import { listDuplicateOrgPairs, mergeOrganisations, type DuplicateOrgPair } from '@/lib/duplicates'
+import { useTags } from '@/lib/tags'
 import { CompanyLogo } from '@/components/CompanyLogo'
 import { DuplicatesModal, type DuplicateCandidate } from '@/components/merge/DuplicatesModal'
 import { DuplicatesBar } from '@/components/merge/DuplicatesBar'
@@ -46,6 +47,8 @@ export function OrganisationsPage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [addOpen, setAddOpen] = useState(false)
+  const [tagId, setTagId] = useState<number | null>(null)
+  const { tags } = useTags()
   const [duplicates, setDuplicates] = useState<DuplicateOrgPair[]>([])
   const [duplicatesOpen, setDuplicatesOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
@@ -62,7 +65,7 @@ export function OrganisationsPage() {
 
   useEffect(() => {
     setPage(0)
-  }, [debouncedSearch, industry, showAll])
+  }, [debouncedSearch, industry, tagId, showAll])
 
   useEffect(() => {
     let cancelled = false
@@ -70,6 +73,7 @@ export function OrganisationsPage() {
     listOrganisations({
       search: debouncedSearch,
       industry,
+      tagId,
       showAll,
       sortColumn: sort.column,
       ascending: sort.ascending,
@@ -86,7 +90,7 @@ export function OrganisationsPage() {
     return () => {
       cancelled = true
     }
-  }, [debouncedSearch, industry, showAll, sort, page, refreshKey])
+  }, [debouncedSearch, industry, tagId, showAll, sort, page, refreshKey])
 
   const handleSort = (column: OrganisationSortColumn) => {
     setSort((current) =>
@@ -136,6 +140,21 @@ export function OrganisationsPage() {
           {industries.map((ind) => (
             <option key={ind} value={ind}>
               {ind}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={tagId ?? ''}
+          onChange={(e) => setTagId(e.target.value ? Number(e.target.value) : null)}
+          aria-label="Filter by tag"
+          className="rounded-lg border px-3 py-2 text-sm outline-none transition-colors duration-150"
+          style={{ borderColor: 'var(--border)', background: 'var(--surface-raised)', color: 'var(--text)' }}
+        >
+          <option value="">All tags</option>
+          {tags.map((tag) => (
+            <option key={tag.id} value={tag.id}>
+              {tag.label}
             </option>
           ))}
         </select>

@@ -26,18 +26,30 @@ function sanitizeForOrFilter(term: string): string {
   return term.replace(/[,()]/g, ' ').trim()
 }
 
-export async function listContacts(params: ListContactsParams): Promise<ListContactsResult> {
-  const { search, organisationId, tagId, sortColumn, ascending, page } = params
-  const from = page * CONTACTS_PAGE_SIZE
-  const to = from + CONTACTS_PAGE_SIZE - 1
+function buildContactsBase() {
+  return supabase.from('v_contacts_list').select('*', { count: 'exact' })
+}
 
-  let query = supabase.from('v_contacts_list').select('*', { count: 'exact' })
+/**
+ * The filters, without the paging — shared by the table and its export, so an
+ * export can never disagree with what is on screen. `empty` short-circuits the
+ * tag filter finding nothing.
+ *
+ * Wrapped in an object, and it matters: a postgrest-js builder is thenable, so
+ * an `async` function returning one bare would resolve it on the way out and
+ * run the query.
+ */
+async function filteredContactsQuery(
+  params: ListContactsParams,
+): Promise<{ query: ReturnType<typeof buildContactsBase>; empty: boolean }> {
+  const { search, organisationId, tagId } = params
+  let query = buildContactsBase()
 
   if (organisationId) query = query.eq('organisation_id', organisationId)
 
   if (tagId !== null) {
     const contactIds = await contactIdsForTag(tagId)
-    if (contactIds.length === 0) return { rows: [], total: 0 }
+    if (contactIds.length === 0) return { query, empty: true }
     query = query.in('id', contactIds)
   }
 
@@ -48,13 +60,39 @@ export async function listContacts(params: ListContactsParams): Promise<ListCont
     )
   }
 
-  query = query.order(sortColumn, { ascending }).range(from, to)
+  return { query, empty: false }
+}
 
-  const { data, error, count } = await query
+export async function listContacts(params: ListContactsParams): Promise<ListContactsResult> {
+  const from = params.page * CONTACTS_PAGE_SIZE
+  const to = from + CONTACTS_PAGE_SIZE - 1
+
+  const { query: base, empty } = await filteredContactsQuery(params)
+  if (empty) return { rows: [], total: 0 }
+
+  const { data, error, count } = await base
+    .order(params.sortColumn, { ascending: params.ascending })
+    .range(from, to)
+
   if (error) throw error
   // id/first_name/is_primary/is_stale are guaranteed non-null even though
   // the generated type marks every view column nullable — see the comment
   // on ContactListRow in types/crm.ts.
+  return { rows: (data ?? []) as ContactListRow[], total: count ?? 0 }
+}
+
+/** Everything the current filters match, not just the visible page. */
+export const CONTACTS_EXPORT_LIMIT = 5000
+
+export async function exportContacts(params: ListContactsParams): Promise<ListContactsResult> {
+  const { query: base, empty } = await filteredContactsQuery(params)
+  if (empty) return { rows: [], total: 0 }
+
+  const { data, error, count } = await base
+    .order(params.sortColumn, { ascending: params.ascending })
+    .limit(CONTACTS_EXPORT_LIMIT)
+
+  if (error) throw error
   return { rows: (data ?? []) as ContactListRow[], total: count ?? 0 }
 }
 

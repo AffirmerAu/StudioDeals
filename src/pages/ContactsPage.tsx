@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CONTACTS_PAGE_SIZE,
+  exportContacts,
   listContacts,
   type ContactSortColumn,
 } from '@/lib/contacts'
@@ -17,6 +18,8 @@ import { Combobox } from '@/components/Combobox'
 import { ContactFormModal } from '@/components/contacts/ContactFormModal'
 import { DuplicatesModal, type DuplicateCandidate } from '@/components/merge/DuplicatesModal'
 import { DuplicatesBar } from '@/components/merge/DuplicatesBar'
+import { ExportButton } from '@/components/ExportButton'
+import { datedFilename, toCsv, toCsvDate } from '@/lib/csv'
 import { listDuplicateContactPairs, mergeContacts, type DuplicateContactPair } from '@/lib/duplicates'
 import type { ContactListRow } from '@/types/crm'
 
@@ -91,6 +94,29 @@ export function ContactsPage() {
     }
   }, [debouncedSearch, organisation, tagId, sort, page, refreshKey])
 
+  const buildExport = async () => {
+    const { rows: all } = await exportContacts({
+      search: debouncedSearch, organisationId: organisation?.id ?? null, tagId,
+      sortColumn: sort.column, ascending: sort.ascending, page: 0,
+    })
+    const contents = toCsv(
+      ['First name', 'Last name', 'Role', 'Organisation', 'Email', 'Phone',
+       'Primary contact', 'Last contacted', 'Notes'],
+      all.map((c) => [
+        c.first_name,
+        c.last_name,
+        c.role,
+        c.organisation_name,
+        c.email,
+        c.phone,
+        c.is_primary ? 'Yes' : 'No',
+        toCsvDate(c.last_contacted_at),
+        c.notes,
+      ]),
+    )
+    return { filename: datedFilename('contacts'), contents, rows: all.length }
+  }
+
   const handleSort = (column: ContactSortColumn) => {
     setSort((current) =>
       current.column === column ? { column, ascending: !current.ascending } : { column, ascending: true },
@@ -108,6 +134,7 @@ export function ContactsPage() {
             onOpen={() => setDuplicatesOpen(true)}
             from={BACK_TO_CONTACTS}
           />
+          <ExportButton build={buildExport} />
           <button
             type="button"
             onClick={() => setAddOpen(true)}

@@ -8,6 +8,7 @@ import { fullName } from '@/lib/format'
 import { useToast } from '@/lib/toast-context'
 import { SkeletonBlock } from '@/components/Skeleton'
 import { TagEditor } from '@/components/TagEditor'
+import { RecordTasks } from '@/components/RecordTasks'
 import { EmptyState } from '@/components/EmptyState'
 import { CompanyLogo } from '@/components/CompanyLogo'
 import { DealsByStage } from '@/components/DealsByStage'
@@ -35,6 +36,7 @@ export function OrganisationDetailPage() {
 
   const [form, setForm] = useState<OrganisationFormState | null>(null)
   const [saving, setSaving] = useState(false)
+  const [activityKey, setActivityKey] = useState(0)
 
   useEffect(() => {
     if (!id) return
@@ -154,6 +156,11 @@ export function OrganisationDetailPage() {
           </form>
 
           <aside className="space-y-6">
+            <RecordTasks
+              target={{ kind: 'organisation', id }}
+              onCompleted={() => setActivityKey((k) => k + 1)}
+            />
+
             <section>
               <h2 className="text-sm font-semibold tracking-tight">Contacts</h2>
               {contacts.length === 0 ? (
@@ -195,7 +202,7 @@ export function OrganisationDetailPage() {
         <section className="mt-10 max-w-2xl">
           <h2 className="text-sm font-semibold tracking-tight">Activity</h2>
           <div className="mt-3">
-            <ActivityTimeline organisationId={id} logDefaults={{ organisationId: id }} />
+            <ActivityTimeline key={activityKey} organisationId={id} logDefaults={{ organisationId: id }} />
           </div>
         </section>
       </div>

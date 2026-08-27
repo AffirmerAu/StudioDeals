@@ -19,7 +19,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { StageBadge } from '@/components/StageBadge'
 import { CompanyLogo } from '@/components/CompanyLogo'
 import { ActivityTimeline } from '@/components/ActivityTimeline'
-import { DealTasks } from '@/components/deals/DealTasks'
+import { RecordTasks } from '@/components/RecordTasks'
 import { BackLink, MetaRow, SaveBar, useBackTarget } from '@/components/RecordPage'
 import { DealFields } from '@/components/deals/DealFields'
 import { dealFormValues, toDealFormState, type DealFormState } from '@/components/deals/deal-form'
@@ -248,10 +248,13 @@ export function DealDetailPage() {
           </form>
 
           <aside className="space-y-6">
-            <DealTasks
-              dealId={deal.id}
-              organisationId={deal.organisation_id}
-              contactId={deal.primary_contact_id}
+            <RecordTasks
+              target={{
+                kind: 'deal',
+                id: deal.id,
+                organisationId: deal.organisation_id,
+                contactId: deal.primary_contact_id,
+              }}
               // A completed task drops into the history at its completion
               // time, so the timeline has to reload to pick it up.
               onCompleted={() => setActivityKey((k) => k + 1)}

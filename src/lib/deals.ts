@@ -237,12 +237,21 @@ async function organisationIdsMatching(term: string): Promise<string[]> {
   return (data ?? []).map((row) => row.id)
 }
 
-export async function listDeals(params: ListDealsParams): Promise<ListDealsResult> {
-  const { search, stageId, dealType, wonStageIds, lostStageIds, status, sortColumn, ascending, page } = params
-  const from = page * DEALS_PAGE_SIZE
-  const to = from + DEALS_PAGE_SIZE - 1
+/**
+ * The filters, without the paging — shared by the table and its export, so an
+ * export can never disagree with what is on screen.
+ *
+ * Returned wrapped in an object, and it matters: a postgrest-js builder is
+ * thenable, so resolving one runs the query. An `async` function returning the
+ * builder bare would execute it on the way out and hand back rows instead.
+ */
+function buildBase() {
+  return supabase.from('deals').select(BOARD_SELECT, { count: 'exact' })
+}
 
-  let query = supabase.from('deals').select(BOARD_SELECT, { count: 'exact' })
+async function filteredDealsQuery(params: ListDealsParams): Promise<{ query: ReturnType<typeof buildBase> }> {
+  const { search, stageId, dealType, wonStageIds, lostStageIds, status } = params
+  let query = buildBase()
 
   if (stageId !== null) query = query.eq('stage_id', stageId)
   if (dealType) query = query.eq('deal_type', dealType)
@@ -268,7 +277,32 @@ export async function listDeals(params: ListDealsParams): Promise<ListDealsResul
     query = query.or(clauses.join(','))
   }
 
-  query = query.order(sortColumn, { ascending, nullsFirst: false }).range(from, to)
+  return { query }
+}
+
+export async function listDeals(params: ListDealsParams): Promise<ListDealsResult> {
+  const from = params.page * DEALS_PAGE_SIZE
+  const to = from + DEALS_PAGE_SIZE - 1
+
+  const { query: base } = await filteredDealsQuery(params)
+  const query = base
+    .order(params.sortColumn, { ascending: params.ascending, nullsFirst: false })
+    .range(from, to)
+
+  const { data, error, count } = await query
+  if (error) throw error
+  return { rows: (data ?? []).map(flattenBoardRow), total: count ?? 0 }
+}
+
+/** Everything the current filters match, not just the visible page — a page of
+ *  fifty is rarely what someone wants in a spreadsheet. */
+export const DEALS_EXPORT_LIMIT = 5000
+
+export async function exportDeals(params: ListDealsParams): Promise<ListDealsResult> {
+  const { query: base } = await filteredDealsQuery(params)
+  const query = base
+    .order(params.sortColumn, { ascending: params.ascending, nullsFirst: false })
+    .limit(DEALS_EXPORT_LIMIT)
 
   const { data, error, count } = await query
   if (error) throw error

@@ -3,7 +3,13 @@ import { Link, useNavigate } from 'react-router-dom'
 import { usePipelineStages } from '@/lib/pipeline-stages'
 import { useDebouncedValue } from '@/lib/use-debounced-value'
 import { useToast } from '@/lib/toast-context'
-import { DEALS_PAGE_SIZE, listDeals, type DealBoardRow, type DealSortColumn } from '@/lib/deals'
+import {
+  DEALS_PAGE_SIZE,
+  exportDeals,
+  listDeals,
+  type DealBoardRow,
+  type DealSortColumn,
+} from '@/lib/deals'
 import { formatCents, formatDate } from '@/lib/format'
 import { CompanyLogo } from '@/components/CompanyLogo'
 import { EmptyState } from '@/components/EmptyState'
@@ -11,6 +17,8 @@ import { SkeletonTableRows } from '@/components/Skeleton'
 import { Pagination } from '@/components/Pagination'
 import { SortableHeader, type SortState } from '@/components/SortableHeader'
 import { StageBadge } from '@/components/StageBadge'
+import { ExportButton } from '@/components/ExportButton'
+import { centsToCsvNumber, datedFilename, toCsv, toCsvDate } from '@/lib/csv'
 
 const DEAL_TYPE_OPTIONS = [
   { value: '', label: 'All deal types' },
@@ -90,6 +98,35 @@ export function DealsPage() {
     setPage(0)
   }
 
+  const buildExport = async () => {
+    const { rows: all } = await exportDeals({
+      search: debouncedSearch, stageId, dealType, status, wonStageIds, lostStageIds,
+      sortColumn: sort.column, ascending: sort.ascending, page: 0,
+    })
+    const stageLabel = (id: number) => stages.find((s) => s.id === id)?.label ?? ''
+    const contents = toCsv(
+      ['Deal', 'Organisation', 'Contact', 'Stage', 'Deal type', 'Value (AUD)',
+       'Expected close', 'Source', 'Won', 'Lost', 'Lost reason', 'Notes'],
+      all.map((deal) => [
+        deal.title,
+        deal.organisation_name,
+        deal.contact_name,
+        stageLabel(deal.stage_id),
+        deal.deal_type,
+        // A plain decimal, not formatCents — a column of "$12,000" is text and
+        // does not add up.
+        centsToCsvNumber(deal.value_cents),
+        toCsvDate(deal.expected_close_date),
+        deal.source,
+        toCsvDate(deal.won_at),
+        toCsvDate(deal.lost_at),
+        deal.lost_reason,
+        deal.notes,
+      ]),
+    )
+    return { filename: datedFilename('deals'), contents, rows: all.length }
+  }
+
   const toggleSort = (column: DealSortColumn) => {
     setSort((current) => ({ column, ascending: current.column === column ? !current.ascending : true }))
     setPage(0)
@@ -99,9 +136,12 @@ export function DealsPage() {
     <div className="p-8">
       <div className="flex items-center justify-between gap-4">
         <h1 className="text-xl font-semibold tracking-tight">Deals</h1>
-        <span className="tabular text-sm" style={{ color: 'var(--text-muted)' }}>
-          {total} {total === 1 ? 'deal' : 'deals'}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="tabular text-sm" style={{ color: 'var(--text-muted)' }}>
+            {total} {total === 1 ? 'deal' : 'deals'}
+          </span>
+          <ExportButton disabled={stagesLoading} build={buildExport} />
+        </div>
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-3">

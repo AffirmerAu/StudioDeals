@@ -12,6 +12,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { DealsByStage } from '@/components/DealsByStage'
 import { ActivityTimeline } from '@/components/ActivityTimeline'
 import { TagEditor } from '@/components/TagEditor'
+import { RecordTasks } from '@/components/RecordTasks'
 import { BackLink, MetaRow, SaveBar, useBackTarget, type BackTarget } from '@/components/RecordPage'
 import { ContactFields } from '@/components/contacts/ContactFields'
 import {
@@ -44,6 +45,7 @@ export function ContactDetailPage() {
 
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
+  const [activityKey, setActivityKey] = useState(0)
 
   useEffect(() => {
     if (!contactId) return
@@ -205,6 +207,11 @@ export function ContactDetailPage() {
           </form>
 
           <aside className="space-y-6">
+            <RecordTasks
+              target={{ kind: 'contact', id: contact.id, organisationId: contact.organisation_id }}
+              onCompleted={() => setActivityKey((k) => k + 1)}
+            />
+
             <section>
               <h2 className="text-sm font-semibold tracking-tight">Record</h2>
               {/* Derived from the activity log, not something you can type —
@@ -231,6 +238,7 @@ export function ContactDetailPage() {
           <h2 className="text-sm font-semibold tracking-tight">Activity</h2>
           <div className="mt-3">
             <ActivityTimeline
+              key={activityKey}
               contactId={contact.id}
               logDefaults={{ contactId: contact.id, organisationId: contact.organisation_id }}
             />
