@@ -11,6 +11,7 @@ export type DealRow = Database['crm']['Tables']['deals']['Row']
 export type ActivityRow = Database['crm']['Tables']['activities']['Row']
 export type PipelineStageRow = Database['crm']['Tables']['pipeline_stages']['Row']
 export type TagRow = Database['crm']['Tables']['tags']['Row']
+export type TargetsRow = Database['crm']['Tables']['targets']['Row']
 
 // `supabase gen types` marks every view column nullable regardless of the
 // underlying table's constraints — Postgres view introspection doesn't
