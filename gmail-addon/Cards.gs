@@ -369,6 +369,17 @@ function taskCard(context) {
     )
     .addWidget(CardService.newTextInput().setFieldName('notes').setTitle('Notes').setMultiline(true));
 
+  if (CONFIG.DEBUG) {
+    // What the picker was seeded with, so a value that comes back unchanged
+    // is recognisable as the default rather than as something chosen.
+    section.addWidget(
+      CardService.newDecoratedText()
+        .setTopLabel('Default (raw ms)')
+        .setText(String(context.defaultDueMs))
+        .setWrapText(true),
+    );
+  }
+
   var deals = context.deals;
   if (deals.length) {
     var picker = CardService.newSelectionInput()
