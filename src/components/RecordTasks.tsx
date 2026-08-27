@@ -7,6 +7,7 @@ import { formatDateTime } from '@/lib/format'
 import { useToast } from '@/lib/toast-context'
 import {
   ACTIVITY_TYPE_LABEL,
+  activityTypePhrase,
   deleteActivity,
   isOverdue,
   listOpenTasksFor,
@@ -155,7 +156,7 @@ export function RecordTasks({ target, onCompleted }: RecordTasksProps) {
                       {formatDateTime(row.due_at)}
                       {/* A follow-up hung off a call is outstanding work too,
                           but it is not a task someone raised. */}
-                      {row.type !== 'task' && ` · from a ${ACTIVITY_TYPE_LABEL[row.type].toLowerCase()}`}
+                      {row.type !== 'task' && ` · from ${activityTypePhrase(row.type)}`}
                     </p>
                     {row.notes && (
                       <p className="mt-1 text-xs break-words" style={{ color: 'var(--text-muted)' }}>

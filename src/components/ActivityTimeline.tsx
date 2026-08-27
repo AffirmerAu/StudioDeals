@@ -3,6 +3,7 @@ import {
   ACTIVITY_TYPE_LABEL,
   deleteActivity,
   listActivities,
+  notePreview,
   setActivityCompleted,
   type TimelineActivityRow,
 } from '@/lib/activities'
@@ -11,6 +12,7 @@ import { useToast } from '@/lib/toast-context'
 import { EmptyState } from '@/components/EmptyState'
 import { SkeletonBlock } from '@/components/Skeleton'
 import { ActivityFormModal, type ActivityDefaults } from '@/components/ActivityFormModal'
+import { ChevronDownIcon } from '@/components/icons'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 interface ActivityTimelineProps {
@@ -218,10 +220,38 @@ function ActivityItem({
   const done = activity.completed_at !== null
   const overdue = activity.due_at !== null && !done && new Date(activity.due_at) < new Date()
 
+  // Collapsed by default: a timeline is for scanning, and an email filed from
+  // Gmail carries a header block and several lines of body that would push
+  // every other entry off the screen.
+  const [expanded, setExpanded] = useState(false)
+  const title = activity.subject || ACTIVITY_TYPE_LABEL[activity.type]
+
   return (
     <li className="rounded-lg border px-3 py-2.5" style={{ borderColor: 'var(--border)' }}>
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-medium">{activity.subject || ACTIVITY_TYPE_LABEL[activity.type]}</span>
+        {activity.notes ? (
+          <button
+            type="button"
+            onClick={() => setExpanded((open) => !open)}
+            aria-expanded={expanded}
+            className="flex min-w-0 cursor-pointer items-center gap-1.5 text-left text-sm font-medium"
+          >
+            {/* Sized and weighted to be findable. At 14px in --text-subtle it
+                was a smudge, and a control nobody can see is not a control. */}
+            <ChevronDownIcon
+              strokeWidth={2}
+              className="size-4 shrink-0 transition-transform duration-150"
+              style={{
+                color: 'var(--color-brand-500)',
+                transform: expanded ? undefined : 'rotate(-90deg)',
+              }}
+            />
+            <span className="truncate">{title}</span>
+          </button>
+        ) : (
+          // Nothing to open, so no control that does nothing when pressed.
+          <span className="truncate text-sm font-medium">{title}</span>
+        )}
         <div className="flex shrink-0 items-center gap-2">
           <span className="tabular text-xs" style={{ color: 'var(--text-subtle)' }}>
             {formatDateTime(activity.occurred_at)}
@@ -233,8 +263,20 @@ function ActivityItem({
       <div className="mt-0.5 flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
         <span>{ACTIVITY_TYPE_LABEL[activity.type] ?? activity.type}</span>
         {activity.contact_name && <span className="shrink-0">· {activity.contact_name}</span>}
-        {activity.notes && <span className="truncate">{activity.notes}</span>}
+        {activity.notes && !expanded && <span className="truncate">{notePreview(activity.notes)}</span>}
       </div>
+
+      {activity.notes && expanded && (
+        // pre-wrap, because a filed email's note is From / To / Date lines, a
+        // blank line, then the body — and collapsing that into a paragraph is
+        // what made it unreadable in the first place.
+        <p
+          className="mt-2 text-xs break-words whitespace-pre-wrap"
+          style={{ color: 'var(--text-muted)' }}
+        >
+          {activity.notes}
+        </p>
+      )}
 
       {activity.due_at && (
         <label className="mt-2 flex w-fit items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>

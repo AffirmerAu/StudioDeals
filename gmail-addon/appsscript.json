@@ -1,0 +1,34 @@
+{
+  "timeZone": "Australia/Sydney",
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/gmail.addons.execute",
+    "https://www.googleapis.com/auth/gmail.addons.current.message.readonly",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/userinfo.email"
+  ],
+  "urlFetchWhitelist": ["https://vfmjrcpemlvseczqvrsw.supabase.co/"],
+  "addOns": {
+    "common": {
+      "name": "StudioDeals",
+      "logoUrl": "https://www.gstatic.com/images/icons/material/system/1x/business_center_black_24dp.png",
+      "layoutProperties": {
+        "primaryColor": "#3385d9",
+        "secondaryColor": "#2a6fb8"
+      },
+      "homepageTrigger": {
+        "runFunction": "onHomepage",
+        "enabled": true
+      }
+    },
+    "gmail": {
+      "contextualTriggers": [
+        {
+          "unconditional": {},
+          "onTriggerFunction": "onGmailMessage"
+        }
+      ]
+    }
+  }
+}

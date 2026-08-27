@@ -3,12 +3,13 @@ import { Link } from 'react-router-dom'
 import { useToast } from '@/lib/toast-context'
 import {
   ACTIVITY_TYPE_LABEL,
+  activityTypePhrase,
   isOverdue,
   listTasks,
-  setActivityCompleted,
-  TASK_FILTERS,
-  TASK_FILTER_LABEL,
   type OpenFollowUpRow,
+  setActivityCompleted,
+  TASK_FILTER_LABEL,
+  TASK_FILTERS,
   type TaskFilter,
 } from '@/lib/activities'
 import { formatDateTime } from '@/lib/format'
@@ -158,7 +159,7 @@ export function TasksPage() {
                       >
                         {overdue && 'Overdue · '}
                         {done ? `Done ${formatDateTime(row.completed_at)}` : formatDateTime(row.due_at)}
-                        {row.type !== 'task' && ` · from a ${ACTIVITY_TYPE_LABEL[row.type].toLowerCase()}`}
+                        {row.type !== 'task' && ` · from ${activityTypePhrase(row.type)}`}
                       </p>
                       {row.notes && (
                         <p className="mt-1 text-xs break-words" style={{ color: 'var(--text-muted)' }}>

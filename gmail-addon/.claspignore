@@ -1,0 +1,10 @@
+# clasp pushes everything not listed here. Tests and notes stay local.
+**/**
+!appsscript.json
+!Config.gs
+!Auth.gs
+!Api.gs
+!Text.gs
+!Message.gs
+!Cards.gs
+!Code.gs

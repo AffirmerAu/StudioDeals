@@ -10,10 +10,17 @@ Numbered migrations, applied by pasting into the Supabase SQL Editor.
 007_merge_contacts.sql        — v_possible_duplicate_contacts,
                                 crm.merge_contacts, v_merge_log
 008_tag_labels_ci.sql         — case-insensitive uniqueness on tag labels
+009_gmail_messages.sql        — gmail_message_id and gmail_thread_id on
+                                crm.activities, and crm.find_contacts_by_email
 
 002 was the Capsule import (staging tables and merge, Phase 0.5). It was
 applied to the live database but the file was never committed here, so a
 rebuild from these files gives an empty CRM rather than the imported one.
+
+The Capsule refresh — a second import of updated Capsule data — was built and
+tested as 009, then dropped before it was ever run. It survives at commit
+78c02ee. If it is ever taken back off the shelf it needs renumbering to 010,
+because 009 is the Gmail one now.
 
 Re-running
 ----------
