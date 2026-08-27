@@ -28,3 +28,10 @@ Kanban drag-and-drop via `@dnd-kit`. Charts via Recharts.
 ## Migrations
 
 Numbered SQL in `/migrations`, run by pasting into the Supabase SQL Editor.
+
+## Gmail add-on
+
+`/gmail-addon` is a Google Workspace add-on that shows a sender's StudioDeals
+record in the Gmail sidebar. Apps Script, pushed with `clasp`, talking to the
+same Supabase project with the same anon key and the user's own JWT — no
+second backend. See `gmail-addon/README.md`.
