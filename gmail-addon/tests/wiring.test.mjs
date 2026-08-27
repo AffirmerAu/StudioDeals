@@ -103,13 +103,28 @@ check('the message scope is the narrow one',
 // that makes a second Save a no-op rather than a duplicate.
 const writes = [...sources.get('Api.gs').matchAll(/apiFetch\(\s*'([^']+)'[^)]*method:\s*'post'/gs)]
   .map((m) => m[1].split('?')[0])
+// Every request path is built in Text.gs, where the URL tests can reach it.
+// A path assembled inline in Api.gs or Code.gs is one nothing checks.
+const inlinePaths = [...code.matchAll(/apiFetch\(\s*'([^']*\?[^']*)'/g)].map((m) => m[1])
+check('no request path is assembled outside Text.gs', inlinePaths.length === 0,
+  inlinePaths.join(', '))
+check('no URL is built with a double quote in it',
+  !/'[^']*\?[^']*\\?"/.test(code) && !/in\.\(\s*'"'/.test(code))
+
 check('the only write path is /activities',
   writes.every((p) => p === '/activities' || p.startsWith('/rpc/')), writes.join(', '))
 check('every filed row carries its gmail_message_id',
   /gmail_message_id:\s*message\.id/.test(sources.get('Text.gs')))
+const saveHandler = sources.get('Code.gs').slice(
+  sources.get('Code.gs').indexOf('function handleSaveMessage'))
 check('filing reads before it writes',
-  sources.get('Code.gs').indexOf('findSavedMessageIds') <
-    sources.get('Code.gs').indexOf('insertActivities'))
+  saveHandler.indexOf('findSavedMessageIds') > -1 &&
+  saveHandler.indexOf('findSavedMessageIds') < saveHandler.indexOf('fileActivities'))
+// The tolerant path is the only writer, so a collision can never surface as a
+// bare error card.
+check('nothing calls insertActivities outside Api.gs',
+  !/insertActivities/.test(stripComments([...sources].filter(([f]) => f !== 'Api.gs')
+    .map(([, src]) => src).join('\n'))))
 check('occurred_at is the message date, never now()',
   /occurred_at:\s*message\.dateIso/.test(sources.get('Text.gs')))
 // The event's thread id is Gmail's legacy form and does not match the one

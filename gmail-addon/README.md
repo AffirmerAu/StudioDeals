@@ -97,9 +97,21 @@ so a typo there is a failure here rather than a 400 in the sidebar.
 
 ## Filing an email
 
-One row per message, and never a second for the same one. Before writing,
-the add-on asks StudioDeals which of the message ids it already holds; the
-partial unique index on `gmail_message_id` is the backstop, not the mechanism.
+One row per message, and never a second for the same one. Before writing, the
+add-on asks StudioDeals which messages of the open thread it already holds —
+by thread id, one equality filter that uses the index 009 added. The partial
+unique index on `gmail_message_id` is the backstop, not the mechanism.
+
+The first version of that read asked by message id, as
+`gmail_message_id=in.("a","b")`, and `UrlFetchApp` refused the request outright
+with `Invalid argument`: double quotes are not legal in a URL. Every request
+path now lives in `Text.gs` and is asserted URL-safe, because nothing about a
+card can be tested and a malformed URL is not the place to find that out.
+
+If Gmail ever re-threads a conversation, a message filed under the old thread
+id comes back under a new one and the thread read cannot see it. The unique
+index refuses the whole batch; the writer catches that one error and retries
+row by row, so the card still reports honest counts instead of failing.
 
 `occurred_at` is the message's own date, so an email filed a week late lands
 in the right place on the timeline rather than at the top of it. `type` is

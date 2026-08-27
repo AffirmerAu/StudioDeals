@@ -100,7 +100,7 @@ function listStages() {
   var cached = cache.get(STAGES_CACHE_KEY);
   if (cached) return JSON.parse(cached);
 
-  var stages = apiFetch('/pipeline_stages?select=id,label,position,is_won,is_lost&order=position', {});
+  var stages = apiFetch(stagesPath(), {});
   cache.put(STAGES_CACHE_KEY, JSON.stringify(stages), 21600);
   return stages;
 }
@@ -125,12 +125,7 @@ function stageById(stages, id) {
 function listOpenDeals(organisationId) {
   if (!organisationId) return [];
 
-  var deals = apiFetch(
-    '/deals?select=id,title,value_cents,stage_id&organisation_id=eq.' +
-      encodeURIComponent(organisationId) +
-      '&order=board_position',
-    {},
-  );
+  var deals = apiFetch(openDealsPath(organisationId), {});
   var stages = listStages();
 
   var open = [];
@@ -146,32 +141,32 @@ function listOpenDeals(organisationId) {
 
 
 /**
- * Which of these Gmail messages StudioDeals already holds.
+ * Which messages in this thread StudioDeals already holds.
  *
- * The structural characters of the `in.` list stay raw while each id is
- * encoded on its own, so a thread id like `thread-f:1874387461069433417`
- * survives the trip without its colon breaking the filter.
+ * Asked by thread rather than by a list of message ids, and that is the
+ * second version. The first built `gmail_message_id=in.("a","b")`, which
+ * UrlFetchApp rejects outright — double quotes are not legal in a URL — and
+ * dropping the quotes would only have moved the problem to the first id
+ * containing a comma.
+ *
+ * By thread is better anyway: one equality filter instead of a list, it uses
+ * the index 009 put on gmail_thread_id, and every message that could be filed
+ * from this card belongs to the open thread by definition.
  *
  * Reading before writing, rather than leaning on the unique index and
  * PostgREST's duplicate resolution: the index is partial, and a partial index
  * as a conflict target is exactly the combination this project has been
  * bitten by before. It also lets the card say "1 filed, 2 already held".
  */
-function findSavedMessageIds(messageIds) {
-  if (!messageIds.length) return {};
+function findSavedMessageIds(threadId) {
+  if (!threadId) return {};
 
-  var quoted = [];
-  for (var i = 0; i < messageIds.length; i++) {
-    quoted.push('"' + encodeURIComponent(messageIds[i]) + '"');
-  }
-
-  var rows = apiFetch(
-    '/activities?select=gmail_message_id&gmail_message_id=in.(' + quoted.join(',') + ')',
-    {},
-  );
+  var rows = apiFetch(activitiesInThreadPath(threadId), {});
 
   var held = {};
-  for (var j = 0; j < rows.length; j++) held[rows[j].gmail_message_id] = true;
+  for (var i = 0; i < rows.length; i++) {
+    if (rows[i].gmail_message_id) held[rows[i].gmail_message_id] = true;
+  }
   return held;
 }
 
@@ -185,4 +180,38 @@ function insertActivities(rows) {
     payload: rows,
     prefer: 'return=representation',
   });
+}
+
+
+/**
+ * Writes the rows, and survives the one case a thread-level dedupe cannot
+ * see: Gmail re-threading a conversation, so a message already filed under
+ * its old thread id comes back under a new one.
+ *
+ * The unique index refuses the whole batch when that happens, so the retry
+ * goes one row at a time and counts what actually landed. It only ever runs
+ * after a real collision, so the ordinary path is still a single request.
+ */
+function fileActivities(rows) {
+  if (!rows.length) return { filed: 0, duplicates: 0 };
+
+  try {
+    insertActivities(rows);
+    return { filed: rows.length, duplicates: 0 };
+  } catch (err) {
+    if (!isDuplicateError(err)) throw err;
+
+    var filed = 0;
+    var duplicates = 0;
+    for (var i = 0; i < rows.length; i++) {
+      try {
+        insertActivities([rows[i]]);
+        filed++;
+      } catch (rowErr) {
+        if (!isDuplicateError(rowErr)) throw rowErr;
+        duplicates++;
+      }
+    }
+    return { filed: filed, duplicates: duplicates };
+  }
 }

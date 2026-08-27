@@ -253,3 +253,59 @@ function activityRow(message, target) {
     gmail_thread_id: message.threadId || null,
   };
 }
+
+
+/**
+ * PostgREST paths, built in the one file Node can test.
+ *
+ * This exists because of a real failure: the dedupe read was first written as
+ * `gmail_message_id=in.("a","b")`, and UrlFetchApp refused the whole request
+ * with "Invalid argument" before it left the machine. Double quotes are not
+ * legal in a URL. Nothing in a card-shaped test would have caught it, so URL
+ * construction moved here, where urlSafe() below can assert on it.
+ */
+
+function activitiesInThreadPath(threadId) {
+  return '/activities?select=gmail_message_id&gmail_thread_id=eq.' + encodeURIComponent(threadId);
+}
+
+
+function stagesPath() {
+  return '/pipeline_stages?select=id,label,position,is_won,is_lost&order=position';
+}
+
+
+function openDealsPath(organisationId) {
+  return (
+    '/deals?select=id,title,value_cents,stage_id&organisation_id=eq.' +
+    encodeURIComponent(organisationId) +
+    '&order=board_position'
+  );
+}
+
+
+function contactPath(contactId) {
+  return '/v_contacts_list?select=*&id=eq.' + encodeURIComponent(contactId) + '&limit=1';
+}
+
+
+/**
+ * Whether a path is one UrlFetchApp will accept: unreserved characters, the
+ * sub-delims PostgREST needs for its own syntax, and percent escapes. No
+ * quotes, no spaces, no brackets.
+ */
+function urlSafe(path) {
+  return /^[A-Za-z0-9\-._~!$&'()*+,;=:@\/?%]*$/.test(String(path));
+}
+
+
+/**
+ * Whether an error is the database refusing a message it already holds.
+ *
+ * Matched narrowly on purpose: "409" on its own would also match a subject
+ * line, and this decides whether to swallow an error or show it.
+ */
+function isDuplicateError(error) {
+  var message = String(error && error.message ? error.message : error);
+  return /^StudioDeals 409:/.test(message) || /23505|duplicate key value/i.test(message);
+}

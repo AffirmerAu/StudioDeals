@@ -112,10 +112,7 @@ function actionParam(event, name) {
 /** The one contact this address resolves to, re-read rather than carried
  *  across the action so the card never files against a stale record. */
 function contactFor(contactId) {
-  var rows = apiFetch(
-    '/v_contacts_list?select=*&id=eq.' + encodeURIComponent(contactId) + '&limit=1',
-    {},
-  );
+  var rows = apiFetch(contactPath(contactId), {});
   if (!rows.length) throw new Error('That contact is no longer in StudioDeals.');
   return rows[0];
 }
@@ -161,9 +158,7 @@ function handleSaveMessage(event) {
       }
     }
 
-    var ids = [];
-    for (var j = 0; j < chosen.length; j++) ids.push(chosen[j].id);
-    var held = findSavedMessageIds(ids);
+    var held = findSavedMessageIds(thread.threadId);
 
     var rows = [];
     var skipped = 0;
@@ -172,14 +167,14 @@ function handleSaveMessage(event) {
       else rows.push(activityRow(chosen[k], target));
     }
 
-    insertActivities(rows);
+    var written = fileActivities(rows);
 
     return CardService.newActionResponseBuilder()
       .setNavigation(
         CardService.newNavigation().updateCard(
           saveResultCard({
-            filed: rows.length,
-            skipped: skipped,
+            filed: written.filed,
+            skipped: skipped + written.duplicates,
             target: describeTarget(target),
             dealId: target.dealId,
             contactId: target.contactId,
@@ -187,7 +182,9 @@ function handleSaveMessage(event) {
         ),
       )
       .setNotification(
-        CardService.newNotification().setText(describeFiling(rows.length, skipped)),
+        CardService.newNotification().setText(
+          describeFiling(written.filed, skipped + written.duplicates),
+        ),
       )
       .build();
   } catch (err) {

@@ -16,7 +16,9 @@ const T = new Function(
   src +
     '\nreturn { splitAddressList, parseAddress, parseAddressList, sameAddress,' +
     ' pickCounterparty, displayNameFor, describeLastContacted, truncate,' +
-    ' formatCents, isQuoteBoundary, cleanBody, buildNote, describeFiling, activityRow };',
+    ' formatCents, isQuoteBoundary, cleanBody, buildNote, describeFiling, activityRow,' +
+    ' activitiesInThreadPath, openDealsPath, contactPath, stagesPath, urlSafe,' +
+    ' isDuplicateError };',
 )()
 
 let passed = 0
@@ -237,6 +239,47 @@ is(
   Object.keys(T.activityRow({ ...MSG, subject: '', cc: '' }, { ...TARGET, dealId: '' })),
   Object.keys(row),
 )
+
+// ---------- URLs UrlFetchApp will actually accept ----------
+// The bug this guards: gmail_message_id=in.("a","b") was refused outright
+// with "Invalid argument" — double quotes are not legal in a URL.
+const REAL_THREAD = 'thread-a:r-7012497993290584413'
+const REAL_MESSAGE = 'msg-a:r-5774944992509933697'
+
+is(
+  'the thread filter encodes its colon',
+  T.activitiesInThreadPath(REAL_THREAD),
+  '/activities?select=gmail_message_id&gmail_thread_id=eq.thread-a%3Ar-7012497993290584413',
+)
+is('and is URL-safe', T.urlSafe(T.activitiesInThreadPath(REAL_THREAD)), true)
+is('the stages path is URL-safe', T.urlSafe(T.stagesPath()), true)
+is('stages are ordered by position, never hardcoded',
+  T.stagesPath().includes('order=position'), true)
+is('a uuid organisation is URL-safe',
+  T.urlSafe(T.openDealsPath('11111111-1111-1111-1111-111111111111')), true)
+is('a uuid contact is URL-safe',
+  T.urlSafe(T.contactPath('aaaaaaaa-0000-0000-0000-000000000001')), true)
+is('no path quotes anything', [T.activitiesInThreadPath(REAL_MESSAGE), T.openDealsPath('x'), T.contactPath('y')]
+  .some((p) => p.includes('"')), false)
+
+// urlSafe has to be able to fail, or it is not a check.
+is('a quote is not URL-safe', T.urlSafe('/activities?id=in.("a")'), false)
+is('a space is not URL-safe', T.urlSafe('/activities?subject=eq.hello world'), false)
+is('a bracket is not URL-safe', T.urlSafe('/activities?id=eq.[1]'), false)
+is('an encoded quote is fine', T.urlSafe('/activities?id=eq.%22a%22'), true)
+
+// ---------- telling a collision from a failure ----------
+is('a 409 from PostgREST', T.isDuplicateError(new Error('StudioDeals 409: duplicate key value')), true)
+is('the SQLSTATE alone', T.isDuplicateError(new Error('code 23505 on activities')), true)
+is('a 400 is not a collision', T.isDuplicateError(new Error('StudioDeals 400: bad filter')), false)
+is('a 401 is not a collision', T.isDuplicateError(new Error('StudioDeals 401: JWT expired')), false)
+is(
+  'a subject containing 409 does not look like one',
+  T.isDuplicateError(new Error('StudioDeals 400: subject "Invoice 409" rejected')),
+  false,
+)
+is('a plain string error', T.isDuplicateError('StudioDeals 409: duplicate'), true)
+is('nothing at all', T.isDuplicateError(null), false)
 
 // ---------- report ----------
 for (const f of failures) console.error(`  FAIL  ${f}`)
