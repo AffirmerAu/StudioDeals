@@ -58,8 +58,3 @@ type RawDealsNeedingAttentionRow = Database['crm']['Views']['v_deals_needing_att
 export type DealsNeedingAttentionRow = {
   [K in keyof RawDealsNeedingAttentionRow]: NonNullable<RawDealsNeedingAttentionRow[K]>
 }
-
-type RawPendingHandoffRow = Database['crm']['Views']['v_pending_handoff']['Row']
-export type PendingHandoffRow = {
-  [K in keyof RawPendingHandoffRow]: NonNullable<RawPendingHandoffRow[K]>
-}

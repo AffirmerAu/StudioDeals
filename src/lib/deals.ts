@@ -175,21 +175,6 @@ export async function setDealLostReason(id: string, reason: string | null): Prom
   return flattenBoardRow(data)
 }
 
-// handoff_key is write-only: nothing reads it back today. It is stored purely
-// for the future real StudioTime API call to use as an idempotency and
-// correlation token.
-export async function markDealHandedOff(id: string): Promise<{ handedOffAt: string }> {
-  const handedOffAt = new Date().toISOString()
-
-  const { error } = await supabase
-    .from('deals')
-    .update({ handed_off_at: handedOffAt, handoff_key: crypto.randomUUID() })
-    .eq('id', id)
-  if (error) throw error
-
-  return { handedOffAt }
-}
-
 // ---------------------------------------------------------------- deals table
 
 export const DEALS_PAGE_SIZE = 50

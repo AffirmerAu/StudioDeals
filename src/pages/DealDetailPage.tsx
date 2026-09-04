@@ -5,12 +5,11 @@ import { useToast } from '@/lib/toast-context'
 import {
   deleteDeal,
   getDeal,
-  markDealHandedOff,
   nextBoardPosition,
   updateDeal,
   type DealBoardRow,
 } from '@/lib/deals'
-import { formatDate, formatDateTime } from '@/lib/format'
+import { formatDate } from '@/lib/format'
 import type { OrganisationOption } from '@/lib/organisations'
 import type { ContactOption } from '@/lib/contacts'
 import { SkeletonBlock } from '@/components/Skeleton'
@@ -57,8 +56,6 @@ export function DealDetailPage() {
 
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleteBusy, setDeleteBusy] = useState(false)
-  const [handoffOpen, setHandoffOpen] = useState(false)
-  const [handoffBusy, setHandoffBusy] = useState(false)
   const [activityKey, setActivityKey] = useState(0)
 
   useEffect(() => {
@@ -129,11 +126,6 @@ export function DealDetailPage() {
       setForm(toDealFormState(saved))
       setSelection(toSelection(saved))
       showToast('Deal updated')
-
-      // Same rule as the board: a genuine move into Won, on a production deal
-      // that hasn't been sent yet.
-      const movedIntoWon = stageChanged && (stages.find((s) => s.id === saved.stage_id)?.is_won ?? false)
-      if (movedIntoWon && saved.deal_type === 'production' && !saved.handed_off_at) setHandoffOpen(true)
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to update deal', 'error')
     } finally {
@@ -151,21 +143,6 @@ export function DealDetailPage() {
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Failed to delete deal', 'error')
       setDeleteBusy(false)
-    }
-  }
-
-  const handleHandoff = async () => {
-    if (!deal) return
-    setHandoffBusy(true)
-    try {
-      const { handedOffAt } = await markDealHandedOff(deal.id)
-      setDeal((current) => (current ? { ...current, handed_off_at: handedOffAt } : current))
-      showToast('Queued for StudioTime handoff')
-      setHandoffOpen(false)
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to record handoff', 'error')
-    } finally {
-      setHandoffBusy(false)
     }
   }
 
@@ -282,15 +259,6 @@ export function DealDetailPage() {
                     </span>
                   </MetaRow>
                 )}
-                <MetaRow label="StudioTime">
-                  {deal.handed_off_at ? (
-                    <span className="tabular" style={{ color: 'var(--color-stage-won)' }}>
-                      Sent {formatDateTime(deal.handed_off_at)}
-                    </span>
-                  ) : (
-                    'Not sent'
-                  )}
-                </MetaRow>
               </dl>
             </section>
           </aside>
@@ -324,16 +292,6 @@ export function DealDetailPage() {
         busy={deleteBusy}
         onConfirm={handleDelete}
         onClose={() => setDeleteOpen(false)}
-      />
-
-      <ConfirmDialog
-        open={handoffOpen}
-        title="Send to StudioTime?"
-        message={`Send "${deal.title}" to StudioTime? You can also do this later from the dashboard.`}
-        confirmLabel="Send"
-        busy={handoffBusy}
-        onConfirm={handleHandoff}
-        onClose={() => setHandoffOpen(false)}
       />
     </div>
   )

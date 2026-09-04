@@ -1,8 +1,12 @@
 # StudioDeals
 
-Affirmer's CRM. Deals, contacts, and pipeline. Hands off won deals to
-StudioTime as a project name and client name only — no monetary value
-ever leaves this application.
+Affirmer's CRM. Deals, contacts, and pipeline. Nothing leaves this
+application: there is no outbound integration, and no monetary value is sent
+anywhere.
+
+The `deals` table still carries `handed_off_at`, `handoff_key` and
+`studiotime_project_id`, and `crm.v_pending_handoff` still exists, from a
+StudioTime handoff that was never built. Nothing reads or writes them today.
 
 ## Setup
 
