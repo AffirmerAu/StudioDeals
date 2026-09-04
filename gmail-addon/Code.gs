@@ -215,25 +215,40 @@ var DEFAULT_DUE_DAYS = 3;
 
 
 /**
- * The date-time picker's value, in whichever shape the platform sends.
+ * The date-time picker's value, in whichever shape the platform sends, along
+ * with where it came from and what it said before interpretation.
  *
- * Its milliseconds ignore the timezone the person is standing in;
- * dueAtFromPicker closes that gap with the offset the event carries.
+ * The raw number is carried because two different picks once stored the same
+ * instant, which no interpretation of a correctly-read value can produce. When
+ * a reading is impossible, stop reasoning about the formula and look at what
+ * actually arrived.
  */
 function dueAtValue(event) {
   var common = event && event.commonEventObject;
-  var offset = (common && common.timeZone && common.timeZone.offset) || 0;
+
+  // The zone the person is standing in, which is the one the clock face they
+  // just read belongs to. The script's own zone stands in if the event is
+  // quiet about it.
+  var zone = (common && common.timeZone && common.timeZone.id) || null;
 
   if (common && common.formInputs && common.formInputs.dueAt) {
     var picked = common.formInputs.dueAt.dateTimeInput;
     if (picked && picked.msSinceEpoch != null) {
-      return dueAtFromPicker(picked.msSinceEpoch, offset);
+      return {
+        iso: dueAtFromPicker(picked.msSinceEpoch, zone),
+        raw: String(picked.msSinceEpoch),
+        source: 'commonEventObject' + (picked.hasTime === false ? ' (date only)' : ''),
+      };
     }
   }
   if (event && event.formInput && event.formInput.dueAt != null) {
-    return dueAtFromPicker(event.formInput.dueAt, offset);
+    return {
+      iso: dueAtFromPicker(event.formInput.dueAt, zone),
+      raw: String(event.formInput.dueAt),
+      source: 'formInput (legacy)',
+    };
   }
-  return null;
+  return { iso: null, raw: '—', source: 'nothing sent' };
 }
 
 
@@ -350,8 +365,11 @@ function handleAddTask(event) {
     var subject = String(formValue(event, 'subject')).trim();
     if (!subject) return replaceWith(errorCard(new Error('Give the task a name.')));
 
-    var dueAt = dueAtValue(event);
-    if (!dueAt) return replaceWith(errorCard(new Error('Pick a date and time.')));
+    var due = dueAtValue(event);
+    if (!due.iso) {
+      return replaceWith(errorCard(new Error('Pick a date and time. (' + due.source + ')')));
+    }
+    var dueAt = due.iso;
 
     var target = {
       contactId: actionParam(event, 'contactId'),
@@ -377,12 +395,7 @@ function handleAddTask(event) {
         CardService.newNavigation().updateCard(
           doneCard(
             'Task added',
-            [
-              { label: 'Task', value: subject },
-              // Shown back deliberately: the picker's timezone handling is the
-              // one thing here that could not be tested before it shipped.
-              { label: 'Due', value: messageDateText(new Date(dueAt)) },
-            ],
+            taskResultLines(subject, dueAt, due),
             { label: 'Open tasks', path: '/tasks' },
           ),
         ),
@@ -392,6 +405,26 @@ function handleAddTask(event) {
   } catch (err) {
     return replaceWith(err.name === 'AuthRequiredError' ? signInCard(err.message) : errorCard(err));
   }
+}
+
+
+/**
+ * What the Task added card lists. Under DEBUG it also carries the raw picker
+ * value and a handler timestamp, which together say whether a submission is
+ * genuinely new or a stale card firing with the form state it was built with.
+ */
+function taskResultLines(subject, dueAt, due) {
+  var lines = [
+    { label: 'Task', value: subject },
+    { label: 'Due', value: messageDateText(new Date(dueAt)) },
+  ];
+  if (CONFIG.DEBUG) {
+    lines.push({ label: 'Picked (raw ms)', value: due.raw });
+    lines.push({ label: 'Read from', value: due.source });
+    lines.push({ label: 'Stored', value: dueAt });
+    lines.push({ label: 'Handled at', value: messageDateText(new Date()) });
+  }
+  return lines;
 }
 
 

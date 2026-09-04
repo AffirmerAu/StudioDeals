@@ -6,24 +6,20 @@ import {
   fetchDealsNeedingAttention,
   fetchNewDealCountSince,
   fetchOpenDealValueByStage,
-  fetchPendingHandoff,
   fetchPipelineForecast,
   fetchWonValueSince,
   type StageValueTotal,
 } from '@/lib/dashboard'
-import { markDealHandedOff } from '@/lib/deals'
 import { isOverdue, listOpenFollowUps, setActivityCompleted, type OpenFollowUpRow } from '@/lib/activities'
 import { fetchTargets, NO_TARGETS, type TargetValues } from '@/lib/targets'
 import { FollowUpsList } from '@/components/FollowUpsList'
 import { TargetTile } from '@/components/TargetTile'
 import { TargetsFormModal } from '@/components/TargetsFormModal'
-import { formatCents, formatDate } from '@/lib/format'
+import { formatCents } from '@/lib/format'
 import { StatTile } from '@/components/StatTile'
 import { SkeletonBlock } from '@/components/Skeleton'
-import { EmptyState } from '@/components/EmptyState'
-import { ConfirmDialog } from '@/components/ConfirmDialog'
 import { NeedsAttentionList } from '@/components/deals/NeedsAttentionList'
-import type { DealsNeedingAttentionRow, PendingHandoffRow, PipelineForecastRow } from '@/types/crm'
+import type { DealsNeedingAttentionRow, PipelineForecastRow } from '@/types/crm'
 
 // Recharts is the single largest dependency in the app and only these two
 // components touch it. Loading them lazily keeps it off the landing route's
@@ -48,7 +44,6 @@ export function DashboardPage() {
   const [stageValues, setStageValues] = useState<StageValueTotal[]>([])
   const [forecast, setForecast] = useState<PipelineForecastRow[]>([])
   const [needsAttention, setNeedsAttention] = useState<DealsNeedingAttentionRow[]>([])
-  const [pendingHandoff, setPendingHandoff] = useState<PendingHandoffRow[]>([])
   const [wonThisMonth, setWonThisMonth] = useState({ count: 0, valueCents: 0 })
   const [openFollowUps, setOpenFollowUps] = useState<OpenFollowUpRow[]>([])
   const [followUpTotal, setFollowUpTotal] = useState(0)
@@ -56,8 +51,6 @@ export function DashboardPage() {
   const [newDealsThisMonth, setNewDealsThisMonth] = useState(0)
   const [targets, setTargets] = useState<TargetValues>(NO_TARGETS)
   const [targetsOpen, setTargetsOpen] = useState(false)
-  const [handoffDeal, setHandoffDeal] = useState<PendingHandoffRow | null>(null)
-  const [handoffBusy, setHandoffBusy] = useState(false)
 
   useEffect(() => {
     if (stagesLoading) return
@@ -69,18 +62,16 @@ export function DashboardPage() {
       fetchOpenDealValueByStage(),
       fetchPipelineForecast(),
       fetchDealsNeedingAttention(),
-      fetchPendingHandoff(),
       fetchWonValueSince(wonStageIds, startOfMonthISO()),
       listOpenFollowUps(),
       fetchNewDealCountSince(startOfMonthISO()),
       fetchTargets(),
     ])
-      .then(([values, forecastRows, attention, handoff, won, followUps, newDeals, targetValues]) => {
+      .then(([values, forecastRows, attention, won, followUps, newDeals, targetValues]) => {
         if (cancelled) return
         setStageValues(values)
         setForecast(forecastRows)
         setNeedsAttention(attention)
-        setPendingHandoff(handoff)
         setWonThisMonth(won)
         setOpenFollowUps(followUps.rows)
         setFollowUpTotal(followUps.total)
@@ -115,21 +106,6 @@ export function DashboardPage() {
       showToast(error instanceof Error ? error.message : 'Failed to update follow-up', 'error')
     } finally {
       setFollowUpBusyId(null)
-    }
-  }
-
-  const handleConfirmHandoff = async () => {
-    if (!handoffDeal) return
-    setHandoffBusy(true)
-    try {
-      await markDealHandedOff(handoffDeal.id)
-      setPendingHandoff((current) => current.filter((d) => d.id !== handoffDeal.id))
-      showToast('Queued for StudioTime handoff')
-      setHandoffDeal(null)
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to record handoff', 'error')
-    } finally {
-      setHandoffBusy(false)
     }
   }
 
@@ -196,10 +172,9 @@ export function DashboardPage() {
 
       {/* "Won this month" used to live here; the Value won this month tile
           above is the same figure with a target attached. */}
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
         <StatTile label="Open pipeline value" value={formatCents(openValueCents)} />
         <StatTile label="Weighted forecast" value={formatCents(weightedForecastCents)} />
-        <StatTile label="Pending handoff" value={String(pendingHandoff.length)} />
       </div>
 
       <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-2">
@@ -238,45 +213,6 @@ export function DashboardPage() {
         </div>
 
         <NeedsAttentionList rows={needsAttention} />
-
-        <div className="rounded-lg border p-4" style={{ borderColor: 'var(--border)', background: 'var(--surface-raised)' }}>
-          <h3 className="text-sm font-semibold tracking-tight">Pending handoff to StudioTime</h3>
-          {pendingHandoff.length === 0 ? (
-            <div className="mt-2">
-              <EmptyState title="Nothing pending handoff" />
-            </div>
-          ) : (
-            <ul className="mt-3 space-y-2">
-              {pendingHandoff.map((deal) => (
-                <li
-                  key={deal.id}
-                  className="flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 text-sm"
-                  style={{ borderColor: 'var(--border)' }}
-                >
-                  <div className="min-w-0">
-                    <p className="truncate font-medium">{deal.title}</p>
-                    <p className="truncate text-xs" style={{ color: 'var(--text-muted)' }}>
-                      {deal.organisation_name}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 items-center gap-2">
-                    <span className="tabular text-xs" style={{ color: 'var(--text-subtle)' }}>
-                      Won {formatDate(deal.won_at)}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setHandoffDeal(deal)}
-                      className="rounded-lg px-2.5 py-1 text-xs font-medium text-white transition-colors duration-150"
-                      style={{ background: 'var(--color-brand-500)' }}
-                    >
-                      Send
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
       </div>
 
       <TargetsFormModal
@@ -284,16 +220,6 @@ export function DashboardPage() {
         targets={targets}
         onClose={() => setTargetsOpen(false)}
         onSaved={setTargets}
-      />
-
-      <ConfirmDialog
-        open={handoffDeal !== null}
-        title="Send to StudioTime?"
-        message={handoffDeal ? `Send "${handoffDeal.title}" to StudioTime?` : ''}
-        confirmLabel="Send"
-        busy={handoffBusy}
-        onConfirm={handleConfirmHandoff}
-        onClose={() => setHandoffDeal(null)}
       />
     </div>
   )

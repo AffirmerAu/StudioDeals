@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { DealsNeedingAttentionRow, PendingHandoffRow, PipelineForecastRow } from '@/types/crm'
+import type { DealsNeedingAttentionRow, PipelineForecastRow } from '@/types/crm'
 
 export async function fetchPipelineForecast(): Promise<PipelineForecastRow[]> {
   const { data, error } = await supabase
@@ -15,16 +15,6 @@ export async function fetchDealsNeedingAttention(): Promise<DealsNeedingAttentio
   const { data, error } = await supabase.from('v_deals_needing_attention').select('*')
   if (error) throw error
   return (data ?? []) as DealsNeedingAttentionRow[]
-}
-
-export async function fetchPendingHandoff(): Promise<PendingHandoffRow[]> {
-  const { data, error } = await supabase
-    .from('v_pending_handoff')
-    .select('*')
-    .order('won_at', { ascending: false })
-
-  if (error) throw error
-  return (data ?? []) as PendingHandoffRow[]
 }
 
 export interface StageValueTotal {

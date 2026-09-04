@@ -109,8 +109,15 @@ const writes = [...sources.get('Api.gs').matchAll(/apiFetch\(\s*'([^']+)'[^)]*me
 const inlinePaths = [...code.matchAll(/apiFetch\(\s*'([^']*\?[^']*)'/g)].map((m) => m[1])
 check('no request path is assembled outside Text.gs', inlinePaths.length === 0,
   inlinePaths.join(', '))
-check('no URL is built with a double quote in it',
-  !/'[^']*\?[^']*\\?"/.test(code) && !/in\.\(\s*'"'/.test(code))
+// Targeted, because the loose version flagged a Java date format that happens
+// to contain a quoted literal. A check that fires on unrelated code is a check
+// people learn to ignore.
+const pathLiterals = [...code.matchAll(/'(\/[^']*\?[^']*)'/g)].map((m) => m[1])
+check('no request path literal contains a double quote',
+  pathLiterals.every((p) => !p.includes('"')),
+  pathLiterals.filter((p) => p.includes('"')).join(', '))
+check('nothing splices a bare double quote into a request',
+  !/'"'\s*\+|\+\s*'"'/.test(code))
 
 // The add-on may create people and the organisations they belong to, and log
 // activity. It must never write to deals: a deal's value and stage are the

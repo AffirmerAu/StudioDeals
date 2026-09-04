@@ -392,22 +392,38 @@ function organisationsPath() {
 
 
 /**
- * When the date-time picker's value has to be read as an instant.
+ * The wall clock the date-time picker meant, as 'YYYY-MM-DDTHH:mm:ss'.
  *
- * The picker hands back milliseconds since epoch that ignore the timezone the
- * person is standing in, and commonEventObject.timeZone.offset is what closes
- * the gap. Get the sign wrong and a task due at 5pm lands at 3am, so the card
- * that follows shows the time it settled on — the first task you set will say
- * whether this is right.
+ * Measured, after two wrong guesses: picking 5pm on 30 August returned
+ * 1788109200000, which is 2026-08-30T17:00:00Z — ten hours ahead of the
+ * instant that wall clock actually names in Sydney. The widget reports the
+ * face of the clock as though it were UTC, so the honest first step is to read
+ * the face and let the caller decide what zone it belongs to.
+ *
+ * The symmetry argument that talked me out of this was wrong: the widget is
+ * seeded with a true instant through setValueInMsSinceEpoch and renders it
+ * locally, but it does not report one back. In is not out.
  */
-function dueAtFromPicker(msSinceEpoch, offsetMs) {
+function pickerWallClock(msSinceEpoch) {
   // Not `Number(x)` on its own: Number(null) and Number('') are both 0, and a
   // task with no date picked would quietly land in January 1970.
   if (msSinceEpoch == null || msSinceEpoch === '') return null;
 
   var ms = Number(msSinceEpoch);
   if (!isFinite(ms)) return null;
-  return new Date(ms - Number(offsetMs || 0)).toISOString();
+
+  var d = new Date(ms);
+  function pad(n) {
+    return (n < 10 ? '0' : '') + n;
+  }
+  return (
+    d.getUTCFullYear() +
+    '-' + pad(d.getUTCMonth() + 1) +
+    '-' + pad(d.getUTCDate()) +
+    'T' + pad(d.getUTCHours()) +
+    ':' + pad(d.getUTCMinutes()) +
+    ':' + pad(d.getUTCSeconds())
+  );
 }
 
 

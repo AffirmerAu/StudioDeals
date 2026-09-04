@@ -178,9 +178,19 @@ indistinguishable on `/tasks`. Tasks are excluded from
 `crm.recompute_last_contacted`, so setting a follow-up does not mark a client
 as recently contacted.
 
-**One thing to check on first use.** The date-time picker returns milliseconds
-that ignore the timezone the person is standing in, and
-`commonEventObject.timeZone.offset` is what closes the gap. Which direction
-that correction runs could not be tested from the build side, so the card that
-follows shows the time it settled on. If a task set for 5pm comes back saying
-3am, the sign is wrong in `dueAtFromPicker` and it is a one-character fix.
+**The date-time picker reports a clock face, not an instant.** Picking 5pm on
+30 August 2026 in Sydney returns `1788109200000`, which is
+`2026-08-30T17:00:00Z` — ten hours ahead of the moment that wall clock actually
+names. So `pickerWallClock` reads the face, and `dueAtFromPicker` resolves it
+with `Utilities.parseDate` inside the viewer's timezone.
+
+`parseDate` rather than subtracting `commonEventObject.timeZone.offset`,
+because that offset is the one in force *today*: a task set in September for a
+date in November would have been an hour out once Sydney moved to daylight
+time, and nothing would have said so.
+
+This took three attempts — subtract, don't subtract, then finally look at the
+number — and the lesson is cheaper than the detour was. The confirmation card
+carries `Picked (raw ms)` under `CONFIG.DEBUG` for exactly this reason. When a
+value is arriving from a platform you cannot test against, print it before
+theorising about it.

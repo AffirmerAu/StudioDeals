@@ -115,3 +115,25 @@ function probeThreadAccess(event) {
     return { total: 0, readable: 0, error: String(err && err.message ? err.message : err) };
   }
 }
+
+
+/** The format pickerWallClock emits, in the Java syntax Utilities speaks. */
+var PICKER_WALL_FORMAT = "yyyy-MM-dd'T'HH:mm:ss";
+
+
+/**
+ * The instant a picked date and time actually names.
+ *
+ * Utilities.parseDate resolves the wall clock inside the given zone, using the
+ * offset in force *on that date* — which matters, because the first version of
+ * this subtracted commonEventObject.timeZone.offset, the offset in force
+ * today. A task set in September for a date in November would have been an
+ * hour out when Sydney moved to daylight time, and nothing would have said so.
+ */
+function dueAtFromPicker(msSinceEpoch, timeZoneId) {
+  var wall = pickerWallClock(msSinceEpoch);
+  if (!wall) return null;
+
+  var zone = timeZoneId || Session.getScriptTimeZone();
+  return Utilities.parseDate(wall, zone, PICKER_WALL_FORMAT).toISOString();
+}

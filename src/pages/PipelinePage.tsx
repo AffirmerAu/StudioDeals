@@ -20,7 +20,6 @@ import {
   deleteDeal,
   listDealsForBoard,
   setDealLostReason,
-  markDealHandedOff,
   setDealStage,
   updateDealPosition,
   type DealBoardRow,
@@ -71,8 +70,6 @@ export function PipelinePage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [createStageId, setCreateStageId] = useState<number | null>(null)
 
-  const [handoffDeal, setHandoffDeal] = useState<DealBoardRow | null>(null)
-  const [handoffBusy, setHandoffBusy] = useState(false)
   const [deletingDeal, setDeletingDeal] = useState<DealBoardRow | null>(null)
   const [deleteBusy, setDeleteBusy] = useState(false)
   // Two shapes of "mark lost": from the menu the stage move is still pending,
@@ -145,20 +142,6 @@ export function PipelinePage() {
     localStorage.setItem(SHOW_LOST_KEY, String(next))
   }
 
-  const isWonStage = (stageId: number) => stages.find((s) => s.id === stageId)?.is_won ?? false
-
-  // Only prompt for a genuine transition into Won — not a reorder within
-  // Won, not a re-save of an already-Won deal, not non-production deals
-  // (matches v_pending_handoff's own filter), and never twice for the same
-  // deal.
-  const maybePromptHandoff = (previousStageId: number | null, deal: DealBoardRow) => {
-    if (deal.deal_type !== 'production') return
-    if (deal.handed_off_at) return
-    if (!isWonStage(deal.stage_id)) return
-    if (previousStageId !== null && isWonStage(previousStageId)) return
-    setHandoffDeal(deal)
-  }
-
   const isLostStage = (stageId: number) => stages.find((s) => s.id === stageId)?.is_lost ?? false
 
   /** Only on a genuine move into Lost — not a reorder within it. */
@@ -203,7 +186,6 @@ export function PipelinePage() {
     const previous = deals
     const updatedDeal = { ...dragged, stage_id: destStageId, board_position: newPosition }
     setDeals((current) => current.map((d) => (d.id === dragged.id ? updatedDeal : d)))
-    maybePromptHandoff(dragged.stage_id, updatedDeal)
     maybePromptLostReason(dragged.stage_id, updatedDeal)
 
     updateDealPosition(dragged.id, { stage_id: destStageId, board_position: newPosition }).catch(
@@ -221,7 +203,6 @@ export function PipelinePage() {
   const handleMarkStage = async (deal: DealBoardRow, stage: PipelineStageRow, lostReason?: string | null) => {
     const destDeals = (columns.get(stage.id) ?? []).filter((d) => d.id !== deal.id)
     const boardPosition = computeBoardPosition(destDeals, destDeals.length)
-    const previousStageId = deal.stage_id
 
     if (stage.is_won) toggleWon(true)
     if (stage.is_lost) toggleLost(true)
@@ -234,7 +215,6 @@ export function PipelinePage() {
       })
       setDeals((current) => current.map((d) => (d.id === saved.id ? saved : d)))
       showToast(`Marked as ${stage.label}`)
-      maybePromptHandoff(previousStageId, saved)
     } catch (error) {
       showToast(error instanceof Error ? error.message : `Failed to mark as ${stage.label}`, 'error')
     }
@@ -272,23 +252,6 @@ export function PipelinePage() {
       showToast(error instanceof Error ? error.message : 'Failed to delete deal', 'error')
     } finally {
       setDeleteBusy(false)
-    }
-  }
-
-  const handleConfirmHandoff = async () => {
-    if (!handoffDeal) return
-    setHandoffBusy(true)
-    try {
-      const { handedOffAt } = await markDealHandedOff(handoffDeal.id)
-      setDeals((current) =>
-        current.map((d) => (d.id === handoffDeal.id ? { ...d, handed_off_at: handedOffAt } : d)),
-      )
-      showToast('Queued for StudioTime handoff')
-      setHandoffDeal(null)
-    } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Failed to record handoff', 'error')
-    } finally {
-      setHandoffBusy(false)
     }
   }
 
@@ -396,7 +359,6 @@ export function PipelinePage() {
         onCreated={(created) => {
           setDeals((current) => [...current, created])
           setCreateOpen(false)
-          maybePromptHandoff(null, created)
         }}
       />
 
@@ -422,20 +384,6 @@ export function PipelinePage() {
         busy={deleteBusy}
         onConfirm={handleConfirmDelete}
         onClose={() => setDeletingDeal(null)}
-      />
-
-      <ConfirmDialog
-        open={handoffDeal !== null}
-        title="Send to StudioTime?"
-        message={
-          handoffDeal
-            ? `Send "${handoffDeal.title}" to StudioTime? You can also do this later from the dashboard.`
-            : ''
-        }
-        confirmLabel="Send"
-        busy={handoffBusy}
-        onConfirm={handleConfirmHandoff}
-        onClose={() => setHandoffDeal(null)}
       />
     </div>
   )
