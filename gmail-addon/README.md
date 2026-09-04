@@ -147,11 +147,11 @@ small swap: a six-digit code instead of a password, and nothing to type twice.
 and is minted again as needed, under a `LockService` lock because Supabase
 retires a refresh token the moment it is used.
 
-**`CONFIG.DEBUG` adds a Diagnostics section** to every card. It reports how
-many messages in the open thread the add-on can actually read, which is the
-open question behind "Save whole thread" — if it says `1 of 4`, that feature
-needs the whole-mailbox scope and becomes a decision rather than a detail.
-Turn the flag off once it has answered.
+**`CONFIG.DEBUG` adds a Diagnostics section** to the cards — the address that
+was looked up, how many messages of the open thread are readable, and the raw
+value the date-time picker sent. It is off, because both questions it was
+raised for are answered. Turn it back on before theorising about anything else
+arriving from Google.
 
 **`CONFIG.APP_BASE_URL` is blank.** Fill in the deployed web app's URL and the
 cards gain "Open in StudioDeals" links; leave it and they are omitted.

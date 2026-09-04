@@ -20,13 +20,17 @@ var CONFIG = {
   APP_BASE_URL: '',
 
   /**
-   * Adds a Diagnostics section to every card: which address was looked up,
-   * how the token stands, and whether this deployment can read the other
-   * messages in an open thread. That last one decides whether "Save whole
-   * thread" is buildable at all, so leave it on until the first deploy has
-   * answered it.
+   * Adds a Diagnostics section to the cards: which address was looked up, how
+   * many messages of the open thread are readable, and the raw value the
+   * date-time picker sent.
+   *
+   * Off, because both questions it was raised for are answered — the narrow
+   * scope does read a whole thread (measured at 4 of 4), and the picker
+   * reports a clock face rather than an instant. Turn it back on before
+   * theorising about anything else arriving from Google: two wrong guesses
+   * about that picker cost more than printing the number ever did.
    */
-  DEBUG: true,
+  DEBUG: false,
 
   /** All CRM tables live in the crm schema, never public. */
   SCHEMA: 'crm',
