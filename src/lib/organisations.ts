@@ -93,6 +93,26 @@ export type OrganisationFormValues = Pick<
   'name' | 'industry' | 'website' | 'abn' | 'account_number' | 'address' | 'is_client' | 'notes'
 >
 
+/**
+ * An organisation whose name matches exactly, ignoring case.
+ *
+ * `ilike` with no wildcards is a case-insensitive equals. Used before creating
+ * one inline, because organisations have no unique constraint on name and
+ * typing "Whittens Group" when it already exists would quietly split a client
+ * in two — which then needs the merge tool to put back together.
+ */
+export async function findOrganisationByName(name: string): Promise<OrganisationOption | null> {
+  const { data, error } = await supabase
+    .from('organisations')
+    .select('id, name, industry')
+    .ilike('name', name.trim())
+    .limit(1)
+    .maybeSingle()
+
+  if (error) throw error
+  return data
+}
+
 export async function createOrganisation(values: OrganisationFormValues): Promise<OrganisationRow> {
   const { data, error } = await supabase.from('organisations').insert(values).select('*').single()
   if (error) throw error

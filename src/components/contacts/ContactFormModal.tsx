@@ -2,13 +2,21 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { Modal } from '@/components/Modal'
 import { useToast } from '@/lib/toast-context'
 import { createContact } from '@/lib/contacts'
-import type { OrganisationOption } from '@/lib/organisations'
+import {
+  createOrganisation,
+  findOrganisationByName,
+  type OrganisationOption,
+} from '@/lib/organisations'
 import { ContactFields } from '@/components/contacts/ContactFields'
 import {
   contactFormValues,
   EMPTY_CONTACT_FORM,
   type ContactFormState,
 } from '@/components/contacts/contact-form'
+import {
+  organisationFormValues,
+  type OrganisationFormState,
+} from '@/components/organisations/organisation-form'
 import type { ContactRow } from '@/types/crm'
 
 interface ContactFormModalProps {
@@ -31,19 +39,46 @@ export function ContactFormModal({
   const { showToast } = useToast()
   const [values, setValues] = useState<ContactFormState>(EMPTY_CONTACT_FORM)
   const [organisation, setOrganisation] = useState<OrganisationOption | null>(initialOrganisation)
+  const [newOrganisation, setNewOrganisation] = useState<OrganisationFormState | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (!open) return
     setValues(EMPTY_CONTACT_FORM)
     setOrganisation(initialOrganisation)
+    setNewOrganisation(null)
   }, [open, initialOrganisation])
+
+  /**
+   * The organisation to file the contact under, creating it first if the form
+   * is in that mode.
+   *
+   * Whatever it resolves to is selected in the form before the contact is
+   * written. That matters: if the contact insert then fails, the retry finds
+   * an organisation already chosen rather than making a second one.
+   */
+  const resolveOrganisationId = async (): Promise<string | null> => {
+    if (!newOrganisation) return organisation?.id ?? null
+
+    const existing = await findOrganisationByName(newOrganisation.name)
+    if (existing) {
+      setOrganisation(existing)
+      setNewOrganisation(null)
+      showToast(`${existing.name} already existed — using it`)
+      return existing.id
+    }
+
+    const created = await createOrganisation(organisationFormValues(newOrganisation))
+    setOrganisation({ id: created.id, name: created.name, industry: created.industry })
+    setNewOrganisation(null)
+    return created.id
+  }
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault()
     setSaving(true)
     try {
-      const created = await createContact(contactFormValues(values, organisation?.id ?? null))
+      const created = await createContact(contactFormValues(values, await resolveOrganisationId()))
       showToast('Contact created')
       onCreated(created)
     } catch (error) {
@@ -61,6 +96,8 @@ export function ContactFormModal({
           onChange={(next) => setValues((v) => ({ ...v, ...next }))}
           organisation={organisation}
           onOrganisationChange={setOrganisation}
+          newOrganisation={newOrganisation}
+          onNewOrganisationChange={setNewOrganisation}
         />
 
         <div className="flex justify-end gap-2 pt-2">
