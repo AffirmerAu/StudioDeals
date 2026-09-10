@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Modal } from '@/components/Modal'
 import { useToast } from '@/lib/toast-context'
 import { createContact } from '@/lib/contacts'
@@ -17,7 +17,17 @@ import {
   organisationFormValues,
   type OrganisationFormState,
 } from '@/components/organisations/organisation-form'
+import { newContactEmailHref, NEW_CONTACT_RECIPIENT } from '@/lib/contact-email'
 import type { ContactRow } from '@/types/crm'
+
+/** Remembered, because whether you want the prompt is a habit, not a
+ *  per-contact decision. */
+const EMAIL_ME_KEY = 'studiodeals-email-me-new-contacts'
+
+function storedEmailMe(): boolean {
+  // Default on: the whole point of the option is that it is usually wanted.
+  return localStorage.getItem(EMAIL_ME_KEY) !== 'false'
+}
 
 interface ContactFormModalProps {
   open: boolean
@@ -40,7 +50,13 @@ export function ContactFormModal({
   const [values, setValues] = useState<ContactFormState>(EMPTY_CONTACT_FORM)
   const [organisation, setOrganisation] = useState<OrganisationOption | null>(initialOrganisation)
   const [newOrganisation, setNewOrganisation] = useState<OrganisationFormState | null>(null)
+  const [emailMe, setEmailMe] = useState(storedEmailMe)
   const [saving, setSaving] = useState(false)
+
+  // A real anchor rather than assigning window.location: nothing here can be
+  // eaten by a popup blocker, and the draft is inspectable in the DOM before
+  // it is ever opened.
+  const draftRef = useRef<HTMLAnchorElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -78,7 +94,18 @@ export function ContactFormModal({
     event.preventDefault()
     setSaving(true)
     try {
+      // Read before the organisation state is rewritten by resolving it: the
+      // draft should describe the organisation as it was typed.
+      const draft = draftRef.current?.href
       const created = await createContact(contactFormValues(values, await resolveOrganisationId()))
+
+      // Put the captured href back before clicking: resolving the organisation
+      // sets state, and a re-render would otherwise rewrite the link to
+      // describe the organisation as saved rather than as typed.
+      if (emailMe && draft && draftRef.current) {
+        draftRef.current.href = draft
+        draftRef.current.click()
+      }
       showToast('Contact created')
       onCreated(created)
     } catch (error) {
@@ -99,6 +126,36 @@ export function ContactFormModal({
           newOrganisation={newOrganisation}
           onNewOrganisationChange={setNewOrganisation}
         />
+
+        {/* The hint sits outside the label on purpose, the same way Field does
+            it: inside, it is read out as part of the checkbox's name every
+            time it takes focus. */}
+        <div className="space-y-1">
+          <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
+            <input
+              type="checkbox"
+              checked={emailMe}
+              onChange={(e) => {
+                setEmailMe(e.target.checked)
+                localStorage.setItem(EMAIL_ME_KEY, String(e.target.checked))
+              }}
+            />
+            Email me the details
+          </label>
+          <p className="pl-6 text-xs" style={{ color: 'var(--text-subtle)' }}>
+            Opens a draft to {NEW_CONTACT_RECIPIENT} with everything filled in.
+          </p>
+        </div>
+
+        <a
+          ref={draftRef}
+          href={newContactEmailHref(values, organisation, newOrganisation)}
+          className="hidden"
+          aria-hidden="true"
+          tabIndex={-1}
+        >
+          Email draft
+        </a>
 
         <div className="flex justify-end gap-2 pt-2">
           <button

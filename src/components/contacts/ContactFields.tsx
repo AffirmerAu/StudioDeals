@@ -65,37 +65,45 @@ export function ContactFields({
         </Field>
       </div>
 
-      <div className="space-y-1.5">
-        <div className="flex items-center justify-between gap-3">
-          {creating ? (
-            <span className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
-              New organisation
-            </span>
-          ) : (
+      {creating ? (
+        /* A fieldset, because these fields now sit beside the contact's own
+           and two of the labels are the same word. The legend is what tells a
+           screen reader which "Notes" it has landed in. */
+        <fieldset className="space-y-4 rounded-lg border p-3" style={{ borderColor: 'var(--border)' }}>
+          <legend className="flex w-full items-center justify-between gap-3 px-1 text-xs font-medium">
+            <span style={{ color: 'var(--text-muted)' }}>New organisation</span>
+            <button
+              type="button"
+              onClick={stopCreating}
+              className="cursor-pointer font-medium transition-colors duration-150"
+              style={{ color: 'var(--color-brand-500)' }}
+            >
+              Find an existing one
+            </button>
+          </legend>
+          <OrganisationFields
+            values={newOrganisation}
+            onChange={(next) => onNewOrganisationChange?.({ ...newOrganisation, ...next })}
+          />
+        </fieldset>
+      ) : (
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-3">
             <label htmlFor="contact-organisation" className="text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
               Organisation
             </label>
-          )}
-          {canCreate && (
-            <button
-              type="button"
-              onClick={creating ? stopCreating : startCreating}
-              className="cursor-pointer text-xs font-medium transition-colors duration-150"
-              style={{ color: 'var(--color-brand-500)' }}
-            >
-              {creating ? 'Find an existing one' : 'Create a new one'}
-            </button>
-          )}
-        </div>
-
-        {creating ? (
-          <div className="space-y-4 rounded-lg border p-3" style={{ borderColor: 'var(--border)' }}>
-            <OrganisationFields
-              values={newOrganisation}
-              onChange={(next) => onNewOrganisationChange?.({ ...newOrganisation, ...next })}
-            />
+            {canCreate && (
+              <button
+                type="button"
+                onClick={startCreating}
+                className="cursor-pointer text-xs font-medium transition-colors duration-150"
+                style={{ color: 'var(--color-brand-500)' }}
+              >
+                Create a new one
+              </button>
+            )}
           </div>
-        ) : (
+
           <Combobox<OrganisationOption>
             id="contact-organisation"
             value={organisation}
@@ -105,8 +113,8 @@ export function ContactFields({
             getKey={(o) => o.id}
             placeholder="Search organisations…"
           />
-        )}
-      </div>
+        </div>
+      )}
 
       <Field label="Role">
         <input
