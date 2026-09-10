@@ -96,10 +96,12 @@ a table until the generated types confirm its shape.
 
 Run it in **Git Bash**, not PowerShell. PowerShell's `>` writes UTF-16 and
 converts line endings to CRLF, which rewrites all 900-odd lines and buries the
-real change in noise. Git Bash passes bytes through unchanged. Right-click the
-repository folder and choose "Git Bash Here".
+real change in noise. Git Bash passes bytes through unchanged.
 
-    cd ~/script/StudioDeals
+Open it in the right place rather than typing a path: find this folder in File
+Explorer, right-click the empty space inside it, and choose "Git Bash Here".
+Then:
+
     git checkout main
     git pull
 
