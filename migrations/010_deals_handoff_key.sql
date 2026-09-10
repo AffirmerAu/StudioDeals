@@ -14,10 +14,9 @@
 -- app entirely. It is recorded here so a rebuild from these files produces the
 -- schema that actually exists, rather than one that is quietly a column short.
 --
--- ⚠️ The column's live type could not be observed from the build side — the
--- generated types map both `text` and `uuid` to `string`. `text` is declared
--- here because it accepts everything the app ever wrote to it (a UUID string
--- from crypto.randomUUID). If live is `uuid`, change this line to match rather
--- than altering live: `if not exists` means this file has never touched it.
+-- The type is uuid, confirmed against live rather than inferred: the generated
+-- types map both `text` and `uuid` to `string`, so information_schema was the
+-- only way to tell. It was first written here as `text` on the strength of the
+-- app storing crypto.randomUUID() into it, which was a guess and was wrong.
 alter table crm.deals
-  add column if not exists handoff_key text;
+  add column if not exists handoff_key uuid;
