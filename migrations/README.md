@@ -12,6 +12,8 @@ Numbered migrations, applied by pasting into the Supabase SQL Editor.
 008_tag_labels_ci.sql         — case-insensitive uniqueness on tag labels
 009_gmail_messages.sql        — gmail_message_id and gmail_thread_id on
                                 crm.activities, and crm.find_contacts_by_email
+010_deals_handoff_key.sql     — records deals.handoff_key, which existed live
+                                but in no migration
 
 002 was the Capsule import (staging tables and merge, Phase 0.5). It was
 applied to the live database but the file was never committed here, so a
@@ -68,3 +70,19 @@ column". The live shape comes from the database itself:
     from information_schema.columns
     where table_schema = 'crm' and table_name = 'v_contacts_list'
     order by ordinal_position;
+
+Checking these files against the database
+-----------------------------------------
+src/types/database.ts is generated from the live database, so it can be used
+to check the migrations without any access to live: build a database from
+these files, list every column of every relation in `crm` from the catalogue,
+and compare the two sets.
+
+Done that way, 17 of 18 relations matched column for column and `deals` did
+not — `handoff_key` was in the generated types and in no migration. That is
+what 010 records. The same check now comes back clean, which is the strongest
+statement available from the build side: the files and the live schema agree
+about every table, view, column and function in `crm`.
+
+Worth re-running whenever database.ts is regenerated. It is the cheap version
+of the problem that produced the 003 reconciliation below.

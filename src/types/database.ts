@@ -22,6 +22,8 @@ export type Database = {
           created_by: string | null
           deal_id: string | null
           due_at: string | null
+          gmail_message_id: string | null
+          gmail_thread_id: string | null
           id: string
           notes: string | null
           occurred_at: string
@@ -36,6 +38,8 @@ export type Database = {
           created_by?: string | null
           deal_id?: string | null
           due_at?: string | null
+          gmail_message_id?: string | null
+          gmail_thread_id?: string | null
           id?: string
           notes?: string | null
           occurred_at?: string
@@ -50,6 +54,8 @@ export type Database = {
           created_by?: string | null
           deal_id?: string | null
           due_at?: string | null
+          gmail_message_id?: string | null
+          gmail_thread_id?: string | null
           id?: string
           notes?: string | null
           occurred_at?: string
@@ -801,6 +807,26 @@ export type Database = {
       }
     }
     Functions: {
+      find_contacts_by_email: {
+        Args: { addr: string }
+        Returns: {
+          created_at: string | null
+          email: string | null
+          first_name: string | null
+          id: string | null
+          is_client: boolean | null
+          is_primary: boolean | null
+          is_stale: boolean | null
+          last_contacted_at: string | null
+          last_name: string | null
+          notes: string | null
+          organisation_id: string | null
+          organisation_industry: string | null
+          organisation_name: string | null
+          phone: string | null
+          role: string | null
+        }[]
+      }
       merge_contacts: {
         Args: { loser: string; survivor: string }
         Returns: undefined
