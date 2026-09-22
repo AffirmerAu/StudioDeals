@@ -51,24 +51,15 @@ export function OrganisationFields({ values, onChange }: OrganisationFieldsProps
             style={inputStyle}
           />
         </Field>
-        <Field label="Account number">
+        <Field label="Address">
           <input
-            value={values.account_number ?? ''}
-            onChange={(e) => onChange({ account_number: e.target.value })}
-            className={`tabular ${inputClass}`}
+            value={values.address ?? ''}
+            onChange={(e) => onChange({ address: e.target.value })}
+            className={inputClass}
             style={inputStyle}
           />
         </Field>
       </div>
-
-      <Field label="Address">
-        <input
-          value={values.address ?? ''}
-          onChange={(e) => onChange({ address: e.target.value })}
-          className={inputClass}
-          style={inputStyle}
-        />
-      </Field>
 
       <label className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-muted)' }}>
         <input

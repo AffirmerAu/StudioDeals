@@ -21,9 +21,21 @@ interface ActivityTimelineProps {
   dealId?: string
   /** FKs to stamp on anything logged from here. Omit to hide the log button. */
   logDefaults?: ActivityDefaults
+  /**
+   * Open every note on arrival instead of collapsed. The deal page is where
+   * the whole history is read rather than scanned, so it opts in; the contact
+   * and organisation pages, where a timeline spans many deals, do not.
+   */
+  defaultExpanded?: boolean
 }
 
-export function ActivityTimeline({ organisationId, contactId, dealId, logDefaults }: ActivityTimelineProps) {
+export function ActivityTimeline({
+  organisationId,
+  contactId,
+  dealId,
+  logDefaults,
+  defaultExpanded = false,
+}: ActivityTimelineProps) {
   const { showToast } = useToast()
   const [rows, setRows] = useState<TimelineActivityRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -150,6 +162,7 @@ export function ActivityTimeline({ organisationId, contactId, dealId, logDefault
             <ActivityItem
               key={activity.id}
               activity={activity}
+              defaultExpanded={defaultExpanded}
               busy={busyId === activity.id}
               onToggleCompleted={() => void toggleCompleted(activity)}
               onEdit={() => setEditing(activity)}
@@ -207,12 +220,14 @@ function RowAction({ label, onClick, color }: { label: string; onClick: () => vo
 function ActivityItem({
   activity,
   busy,
+  defaultExpanded,
   onToggleCompleted,
   onEdit,
   onDelete,
 }: {
   activity: TimelineActivityRow
   busy: boolean
+  defaultExpanded: boolean
   onToggleCompleted: () => void
   onEdit: () => void
   onDelete: () => void
@@ -220,10 +235,10 @@ function ActivityItem({
   const done = activity.completed_at !== null
   const overdue = activity.due_at !== null && !done && new Date(activity.due_at) < new Date()
 
-  // Collapsed by default: a timeline is for scanning, and an email filed from
-  // Gmail carries a header block and several lines of body that would push
-  // every other entry off the screen.
-  const [expanded, setExpanded] = useState(false)
+  // Collapsed by default, because a timeline is usually for scanning and an
+  // email filed from Gmail carries a header block and several lines of body.
+  // The deal page passes defaultExpanded: there the history is the point.
+  const [expanded, setExpanded] = useState(defaultExpanded)
   const title = activity.subject || ACTIVITY_TYPE_LABEL[activity.type]
 
   return (
