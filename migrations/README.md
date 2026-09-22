@@ -114,10 +114,16 @@ https://supabase.com/dashboard/account/tokens also works, exported as
 SUPABASE_ACCESS_TOKEN; that token is a credential, so never paste it into a
 file in this repository.
 
-    npx supabase@latest gen types typescript \
-      --project-id vfmjrcpemlvseczqvrsw \
-      --schema crm \
-      > src/types/database.ts
+    npx supabase@latest gen types typescript --project-id vfmjrcpemlvseczqvrsw --schema crm > src/types/database.ts
+
+One line, deliberately. Split across lines with a trailing backslash it
+only works in bash — pasted into PowerShell the first line runs on its own
+and every line after it is a syntax error.
+
+To stay in PowerShell instead, let `cmd` do the redirect so the encoding
+survives:
+
+    cmd /c "npx supabase@latest gen types typescript --project-id vfmjrcpemlvseczqvrsw --schema crm > src\types\database.ts"
 
 `--schema crm` is not optional. Everything lives in `crm`, and without the
 flag the generator emits `public` instead and breaks every import in the app.
