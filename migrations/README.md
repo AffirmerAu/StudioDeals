@@ -86,3 +86,59 @@ about every table, view, column and function in `crm`.
 
 Worth re-running whenever database.ts is regenerated. It is the cheap version
 of the problem that produced the 003 reconciliation below.
+
+
+Regenerating src/types/database.ts
+-----------------------------------
+Every schema change ends here. The file is the app's record of what the
+database looks like, and the project's rule is that no code is written against
+a table until the generated types confirm its shape.
+
+Run it in **Git Bash**, not PowerShell. PowerShell's `>` writes UTF-16 and
+converts line endings to CRLF, which rewrites all 900-odd lines and buries the
+real change in noise. Git Bash passes bytes through unchanged.
+
+Open it in the right place rather than typing a path: find this folder in File
+Explorer, right-click the empty space inside it, and choose "Git Bash Here".
+Then:
+
+    git checkout main
+    git pull
+
+    npx supabase@latest login
+
+`login` opens a browser and prints a token back. If it fails with a reauth
+error, `npx supabase@latest logout` first — Workspace accounts expire the
+grant periodically. A personal access token from
+https://supabase.com/dashboard/account/tokens also works, exported as
+SUPABASE_ACCESS_TOKEN; that token is a credential, so never paste it into a
+file in this repository.
+
+    npx supabase@latest gen types typescript --project-id vfmjrcpemlvseczqvrsw --schema crm > src/types/database.ts
+
+One line, deliberately. Split across lines with a trailing backslash it
+only works in bash — pasted into PowerShell the first line runs on its own
+and every line after it is a syntax error.
+
+To stay in PowerShell instead, let `cmd` do the redirect so the encoding
+survives:
+
+    cmd /c "npx supabase@latest gen types typescript --project-id vfmjrcpemlvseczqvrsw --schema crm > src\types\database.ts"
+
+`--schema crm` is not optional. Everything lives in `crm`, and without the
+flag the generator emits `public` instead and breaks every import in the app.
+
+Then check it before committing:
+
+    grep -c "gmail_message_id" src/types/database.ts   # expect 3 or more
+    git diff --stat src/types/database.ts              # expect a handful of lines
+    npm run build
+
+A diff of ~900 changed lines means the encoding got mangled — you were in
+PowerShell. Zero occurrences of a column you know exists means it generated
+against the wrong schema or a stale snapshot.
+
+Finally, run the drift check above. Regenerating is when the types and the
+migrations are most likely to disagree, and it is the only moment the
+disagreement is cheap to find.
+
