@@ -14,6 +14,8 @@ Numbered migrations, applied by pasting into the Supabase SQL Editor.
                                 crm.activities, and crm.find_contacts_by_email
 010_deals_handoff_key.sql     — records deals.handoff_key, which existed live
                                 but in no migration
+011_leads_target.sql          — crm.targets.new_leads_per_month, for the
+                                dashboard's new-leads tile
 
 002 was the Capsule import (staging tables and merge, Phase 0.5). It was
 applied to the live database but the file was never committed here, so a
