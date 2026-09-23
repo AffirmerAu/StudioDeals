@@ -4,6 +4,7 @@ import { usePipelineStages } from '@/lib/pipeline-stages'
 import { useToast } from '@/lib/toast-context'
 import {
   fetchDealsNeedingAttention,
+  fetchNewContactCountSince,
   fetchNewDealCountSince,
   fetchOpenDealValueByStage,
   fetchPipelineForecast,
@@ -49,6 +50,7 @@ export function DashboardPage() {
   const [followUpTotal, setFollowUpTotal] = useState(0)
   const [followUpBusyId, setFollowUpBusyId] = useState<string | null>(null)
   const [newDealsThisMonth, setNewDealsThisMonth] = useState(0)
+  const [newLeadsThisMonth, setNewLeadsThisMonth] = useState(0)
   const [targets, setTargets] = useState<TargetValues>(NO_TARGETS)
   const [targetsOpen, setTargetsOpen] = useState(false)
 
@@ -65,9 +67,10 @@ export function DashboardPage() {
       fetchWonValueSince(wonStageIds, startOfMonthISO()),
       listOpenFollowUps(),
       fetchNewDealCountSince(startOfMonthISO()),
+      fetchNewContactCountSince(startOfMonthISO()),
       fetchTargets(),
     ])
-      .then(([values, forecastRows, attention, won, followUps, newDeals, targetValues]) => {
+      .then(([values, forecastRows, attention, won, followUps, newDeals, newLeads, targetValues]) => {
         if (cancelled) return
         setStageValues(values)
         setForecast(forecastRows)
@@ -76,6 +79,7 @@ export function DashboardPage() {
         setOpenFollowUps(followUps.rows)
         setFollowUpTotal(followUps.total)
         setNewDealsThisMonth(newDeals)
+        setNewLeadsThisMonth(newLeads)
         setTargets(targetValues)
       })
       .catch((error: unknown) => {
@@ -146,7 +150,14 @@ export function DashboardPage() {
         </button>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-3">
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <TargetTile
+          label="New leads this month"
+          value={String(newLeadsThisMonth)}
+          target={String(targets.new_leads_per_month)}
+          progress={newLeadsThisMonth}
+          targetRaw={targets.new_leads_per_month}
+        />
         <TargetTile
           label="New deals this month"
           value={String(newDealsThisMonth)}

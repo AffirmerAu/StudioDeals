@@ -65,3 +65,14 @@ export async function fetchNewDealCountSince(sinceISODate: string): Promise<numb
   if (error) throw error
   return count ?? 0
 }
+
+/** A "new lead" is a contact created in the window — head-only, so no rows travel. */
+export async function fetchNewContactCountSince(sinceISODate: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('contacts')
+    .select('id', { count: 'exact', head: true })
+    .gte('created_at', sinceISODate)
+
+  if (error) throw error
+  return count ?? 0
+}
