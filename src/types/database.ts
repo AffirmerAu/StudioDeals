@@ -595,6 +595,7 @@ export type Database = {
         Row: {
           id: number
           new_deals_per_month: number
+          new_leads_per_month: number
           updated_at: string
           won_deals_per_month: number
           won_value_cents_per_month: number
@@ -602,6 +603,7 @@ export type Database = {
         Insert: {
           id?: number
           new_deals_per_month?: number
+          new_leads_per_month?: number
           updated_at?: string
           won_deals_per_month?: number
           won_value_cents_per_month?: number
@@ -609,6 +611,7 @@ export type Database = {
         Update: {
           id?: number
           new_deals_per_month?: number
+          new_leads_per_month?: number
           updated_at?: string
           won_deals_per_month?: number
           won_value_cents_per_month?: number
