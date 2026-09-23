@@ -270,6 +270,7 @@ export function DealDetailPage() {
             <ActivityTimeline
               key={activityKey}
               dealId={deal.id}
+              defaultExpanded
               logDefaults={{
                 dealId: deal.id,
                 organisationId: deal.organisation_id,

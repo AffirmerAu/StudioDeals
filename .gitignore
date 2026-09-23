@@ -29,3 +29,6 @@ dist-ssr
 
 # Apps Script project id, written by clasp
 gmail-addon/.clasp.json
+
+# Supabase CLI scratch — rewritten on every run, machine-specific.
+supabase/.temp/

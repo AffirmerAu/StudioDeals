@@ -19,6 +19,7 @@ function toCount(input: string): number {
 
 export function TargetsFormModal({ open, targets, onClose, onSaved }: TargetsFormModalProps) {
   const { showToast } = useToast()
+  const [newLeads, setNewLeads] = useState('')
   const [newDeals, setNewDeals] = useState('')
   const [wonDeals, setWonDeals] = useState('')
   const [wonValue, setWonValue] = useState('')
@@ -26,6 +27,7 @@ export function TargetsFormModal({ open, targets, onClose, onSaved }: TargetsFor
 
   useEffect(() => {
     if (!open) return
+    setNewLeads(targets.new_leads_per_month ? String(targets.new_leads_per_month) : '')
     setNewDeals(targets.new_deals_per_month ? String(targets.new_deals_per_month) : '')
     setWonDeals(targets.won_deals_per_month ? String(targets.won_deals_per_month) : '')
     // Cents in, dollars on screen — never parsed back through a float.
@@ -38,6 +40,7 @@ export function TargetsFormModal({ open, targets, onClose, onSaved }: TargetsFor
     setSaving(true)
     const values: TargetValues = {
       new_deals_per_month: toCount(newDeals),
+      new_leads_per_month: toCount(newLeads),
       won_deals_per_month: toCount(wonDeals),
       won_value_cents_per_month: wonValue.trim() ? dollarInputToCents(wonValue) : 0,
     }
@@ -59,6 +62,20 @@ export function TargetsFormModal({ open, targets, onClose, onSaved }: TargetsFor
         <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
           These stay put until you change them. Leave one blank to drop its target.
         </p>
+
+        <Field label="New leads per month" htmlFor="target-new-leads">
+          <input
+            id="target-new-leads"
+            type="number"
+            min={0}
+            step={1}
+            value={newLeads}
+            onChange={(e) => setNewLeads(e.target.value)}
+            placeholder="No target"
+            className={inputClass}
+            style={inputStyle}
+          />
+        </Field>
 
         <Field label="New deals per month" htmlFor="target-new-deals">
           <input

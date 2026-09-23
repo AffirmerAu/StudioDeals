@@ -90,7 +90,10 @@ export async function searchOrganisations(query: string, limit = 20): Promise<Or
 
 export type OrganisationFormValues = Pick<
   OrganisationRow,
-  'name' | 'industry' | 'website' | 'abn' | 'account_number' | 'address' | 'is_client' | 'notes'
+  // account_number is deliberately absent: the field came off the form, and
+  // leaving it out of the Pick means an update cannot blank the values already
+  // in the column. The data is still there, and merges still report it.
+  'name' | 'industry' | 'website' | 'abn' | 'address' | 'is_client' | 'notes'
 >
 
 /**

@@ -49,7 +49,6 @@ export function organisationLines(
       { label: 'Industry', value: draft.industry },
       { label: 'Website', value: draft.website },
       { label: 'ABN', value: draft.abn },
-      { label: 'Account number', value: draft.account_number },
       { label: 'Address', value: draft.address },
       { label: 'Client', value: draft.is_client ? 'yes' : 'no' },
       { label: 'Organisation notes', value: draft.notes },

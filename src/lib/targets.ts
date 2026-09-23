@@ -3,11 +3,12 @@ import type { TargetsRow } from '@/types/crm'
 
 export type TargetValues = Pick<
   TargetsRow,
-  'new_deals_per_month' | 'won_deals_per_month' | 'won_value_cents_per_month'
+  'new_deals_per_month' | 'new_leads_per_month' | 'won_deals_per_month' | 'won_value_cents_per_month'
 >
 
 export const NO_TARGETS: TargetValues = {
   new_deals_per_month: 0,
+  new_leads_per_month: 0,
   won_deals_per_month: 0,
   won_value_cents_per_month: 0,
 }
@@ -23,6 +24,7 @@ export async function fetchTargets(): Promise<TargetValues> {
 
   return {
     new_deals_per_month: data.new_deals_per_month,
+    new_leads_per_month: data.new_leads_per_month,
     won_deals_per_month: data.won_deals_per_month,
     won_value_cents_per_month: data.won_value_cents_per_month,
   }
@@ -39,6 +41,7 @@ export async function saveTargets(values: TargetValues): Promise<TargetValues> {
   if (error) throw error
   return {
     new_deals_per_month: data.new_deals_per_month,
+    new_leads_per_month: data.new_leads_per_month,
     won_deals_per_month: data.won_deals_per_month,
     won_value_cents_per_month: data.won_value_cents_per_month,
   }
